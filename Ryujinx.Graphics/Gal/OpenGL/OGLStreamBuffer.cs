@@ -1,34 +1,31 @@
 using OpenTK.Graphics.OpenGL;
 using System;
+using System.Runtime.InteropServices;
 
 namespace Ryujinx.Graphics.Gal.OpenGL
 {
-    class OGLStreamBuffer : IDisposable
+    abstract class OGLStreamBuffer : IDisposable
     {
         public int Handle { get; protected set; }
 
-        public int Size { get; protected set; }
+        public long Size { get; protected set; }
 
         protected BufferTarget Target { get; private set; }
 
-        public OGLStreamBuffer(BufferTarget Target, int Size)
+        private bool Mapped = false;
+
+        public OGLStreamBuffer(BufferTarget Target, long MaxSize)
         {
             this.Target = Target;
-            this.Size   = Size;
-
-            Handle = GL.GenBuffer();
-
-            GL.BindBuffer(Target, Handle);
-
-            GL.BufferData(Target, Size, IntPtr.Zero, BufferUsageHint.StreamDraw);
+            this.Size   = MaxSize;
         }
 
-        public void SetData(int Size, IntPtr HostAddress)
+        public static OGLStreamBuffer Create(BufferTarget Target, long MaxSize)
         {
-            GL.BindBuffer(Target, Handle);
-
-            GL.BufferSubData(Target, IntPtr.Zero, Size, HostAddress);
+            return new SubDataBuffer(Target, MaxSize);
         }
+
+        public abstract void SetData(long Size, IntPtr HostAddress);
 
         public void Dispose()
         {
@@ -42,6 +39,26 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                 GL.DeleteBuffer(Handle);
 
                 Handle = 0;
+            }
+        }
+
+        class SubDataBuffer : OGLStreamBuffer
+        {
+            public SubDataBuffer(BufferTarget Target, long MaxSize)
+                : base(Target, MaxSize)
+            {
+                Handle = GL.GenBuffer();
+
+                GL.BindBuffer(Target, Handle);
+
+                GL.BufferData(Target, (IntPtr)Size, IntPtr.Zero, BufferUsageHint.StreamDraw);
+            }
+
+            public override void SetData(long Size, IntPtr HostAddress)
+            {
+                GL.BindBuffer(Target, Handle);
+
+                GL.BufferSubData(Target, IntPtr.Zero, (IntPtr)Size, HostAddress);
             }
         }
     }
