@@ -1,5 +1,6 @@
 using ChocolArm64.Memory;
 using Ryujinx.Graphics.Gal;
+using System;
 using System.Collections.Concurrent;
 
 namespace Ryujinx.HLE.Gpu.Memory
@@ -198,6 +199,11 @@ namespace Ryujinx.HLE.Gpu.Memory
             }
 
             return -1;
+        }
+
+        public IntPtr GetHostAddress(long VA)
+        {
+            return Memory.GetHostAddress(GetPhysicalAddress(VA));
         }
 
         public long GetPhysicalAddress(long VA)
