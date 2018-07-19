@@ -547,14 +547,7 @@ namespace Ryujinx.HLE.Gpu.Engines
                         {
                             IntPtr Source = Vmm.GetHostAddress(Key);
 
-                            IntPtr Destiny = Gpu.Renderer.Shader.MapBuffer(Key, Cb.Size);
-
-                            unsafe
-                            {
-                                Buffer.MemoryCopy((void*)Source, (void*)Destiny, Cb.Size, Cb.Size);
-                            }
-
-                            Gpu.Renderer.Shader.UnmapBuffer(Key, Cb.Size);
+                            Gpu.Renderer.Shader.SetData(Key, Cb.Size, Source);
                         }
                     }
                 }
@@ -595,9 +588,9 @@ namespace Ryujinx.HLE.Gpu.Engines
 
                 if (!IboCached || Vmm.IsRegionModified(IboKey, (uint)IbSize, NvGpuBufferType.Index))
                 {
-                    byte[] Data = Vmm.ReadBytes(IndexPosition, (uint)IbSize);
+                    IntPtr Address = Vmm.GetHostAddress(IndexPosition);
 
-                    Gpu.Renderer.Rasterizer.CreateIbo(IboKey, Data);
+                    Gpu.Renderer.Rasterizer.CreateIbo(IboKey, IbSize, Address);
                 }
 
                 Gpu.Renderer.Rasterizer.SetIndexArray(IbSize, IndexFormat);
@@ -659,9 +652,9 @@ namespace Ryujinx.HLE.Gpu.Engines
 
                 if (!VboCached || Vmm.IsRegionModified(VboKey, VbSize, NvGpuBufferType.Vertex))
                 {
-                    byte[] Data = Vmm.ReadBytes(VertexPosition, VbSize);
+                    IntPtr Address = Vmm.GetHostAddress(VertexPosition);
 
-                    Gpu.Renderer.Rasterizer.CreateVbo(VboKey, Data);
+                    Gpu.Renderer.Rasterizer.CreateVbo(VboKey, VbSize, Address);
                 }
 
                 Gpu.Renderer.Rasterizer.SetVertexArray(Stride, VboKey, Attribs[Index].ToArray());

@@ -272,24 +272,12 @@ namespace Ryujinx.Graphics.Gal.OpenGL
             return false;
         }
 
-        public IntPtr MapBuffer(long Key, long DataSize)
+        public void SetData(long Key, long DataSize, IntPtr HostAddress)
         {
-            if (!BufferCache.TryGetValue(Key, out OGLStreamBuffer Buffer))
+            if (BufferCache.TryGetValue(Key, out OGLStreamBuffer Buffer))
             {
-                throw new InvalidOperationException();
+                Buffer.SetData(DataSize, HostAddress);
             }
-
-            return Buffer.Map(DataSize);
-        }
-
-        public void UnmapBuffer(long Key, long DataSize)
-        {
-            if (!BufferCache.TryGetValue(Key, out OGLStreamBuffer Buffer))
-            {
-                throw new InvalidOperationException();
-            }
-
-            Buffer.Unmap(DataSize);
         }
 
         private void AttachIfNotNull(int ProgramHandle, ShaderStage Stage)

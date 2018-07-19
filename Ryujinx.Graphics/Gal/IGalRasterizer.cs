@@ -1,3 +1,5 @@
+using System;
+
 namespace Ryujinx.Graphics.Gal
 {
     public interface IGalRasterizer
@@ -45,9 +47,9 @@ namespace Ryujinx.Graphics.Gal
 
         void SetPrimitiveRestartIndex(uint Index);
 
-        void CreateVbo(long Key, byte[] Buffer);
+        void CreateVbo(long Key, long Size, IntPtr Address);
 
-        void CreateIbo(long Key, byte[] Buffer);
+        void CreateIbo(long Key, long Size, IntPtr Address);
 
         void SetVertexArray(int Stride, long VboKey, GalVertexAttrib[] Attribs);
 

@@ -27,8 +27,6 @@ namespace Ryujinx.Graphics.Gal
 
         bool BufferCached(long Key, long DataSize);
 
-        IntPtr MapBuffer(long Key, long DataSize);
-
-        void UnmapBuffer(long Key, long DataSize);
+        void SetData(long Key, long DataSize, IntPtr HostAddress);
     }
 }

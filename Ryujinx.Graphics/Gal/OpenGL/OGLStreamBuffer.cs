@@ -28,35 +28,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
             return new SubDataBuffer(Target, MaxSize);
         }
 
-        public IntPtr Map(long Size)
-        {
-            if (Handle == 0 || Mapped || Size > this.Size)
-            {
-                throw new InvalidOperationException();
-            }
-
-            IntPtr Memory = InternMap(Size);
-
-            Mapped = true;
-
-            return Memory;
-        }
-
-        public void Unmap(long UsedSize)
-        {
-            if (Handle == 0 || !Mapped)
-            {
-                throw new InvalidOperationException();
-            }
-
-            InternUnmap(UsedSize);
-
-            Mapped = false;
-        }
-
-        protected abstract IntPtr InternMap(long Size);
-
-        protected abstract void InternUnmap(long UsedSize);
+        public abstract void SetData(long Size, IntPtr HostAddress);
 
         public void Dispose()
         {
@@ -75,13 +47,9 @@ namespace Ryujinx.Graphics.Gal.OpenGL
 
         class SubDataBuffer : OGLStreamBuffer
         {
-            private IntPtr Memory;
-
             public SubDataBuffer(BufferTarget Target, long MaxSize)
                 : base(Target, MaxSize)
             {
-                Memory = Marshal.AllocHGlobal((IntPtr)Size);
-
                 Handle = GL.GenBuffer();
 
                 GL.BindBuffer(Target, Handle);
@@ -89,16 +57,11 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                 GL.BufferData(Target, (IntPtr)Size, IntPtr.Zero, BufferUsageHint.StreamDraw);
             }
 
-            protected override IntPtr InternMap(long Size)
-            {
-                return Memory;
-            }
-
-            protected override void InternUnmap(long UsedSize)
+            public override void SetData(long Size, IntPtr HostAddress)
             {
                 GL.BindBuffer(Target, Handle);
 
-                GL.BufferSubData(Target, IntPtr.Zero, (IntPtr)UsedSize, Memory);
+                GL.BufferSubData(Target, IntPtr.Zero, (IntPtr)Size, HostAddress);
             }
         }
     }
