@@ -11,7 +11,7 @@ namespace Ryujinx.Graphics.Gal
 
         IEnumerable<ShaderDeclInfo> GetTextureUsage(long Key);
 
-        void SetConstBuffer(long Key, int Cbuf, int DataSize, IntPtr HostAddress);
+        void BindConstBuffers(GalBufferBindings BufferBindings);
 
         void EnsureTextureBinding(string UniformName, int Value);
 
@@ -22,5 +22,11 @@ namespace Ryujinx.Graphics.Gal
         void Unbind(GalShaderType Type);
 
         void BindProgram();
+
+        void CreateBuffer(long Key, long DataSize);
+
+        bool BufferCached(long Key, long DataSize);
+
+        void SetData(long Key, long DataSize, IntPtr HostAddress);
     }
 }
