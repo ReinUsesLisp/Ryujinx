@@ -564,7 +564,7 @@ namespace Ryujinx.HLE.Gpu.Engines
                     {
                         long Key = Cb.Position;
 
-                        if (Vmm.IsRegionModified(Key, Cb.Size, NvGpuBufferType.ConstBuffer))
+                        if (QueryKeyUpload(Vmm, Key, Cb.Size, NvGpuBufferType.ConstBuffer))
                         {
                             IntPtr Source = Vmm.GetHostAddress(Key, Cb.Size);
 
