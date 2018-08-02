@@ -60,14 +60,10 @@ namespace Ryujinx
                 Console.WriteLine("Please specify the folder with the NSOs/IStorage or a NSO/NRO.");
             }
 
-            using (GLScreen Screen = new GLScreen(Ns, Renderer))
+            using (Screen Screen = new GLScreen(Ns, Renderer))
             {
-                Ns.Finish += (Sender, Args) =>
-                {
-                    Screen.Exit();
-                };
-
                 Screen.MainLoop();
+
                 Ns.OnFinish(EventArgs.Empty);
             }
 
