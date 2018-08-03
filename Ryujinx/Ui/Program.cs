@@ -2,7 +2,9 @@
 using Ryujinx.Audio.OpenAL;
 using Ryujinx.Graphics.Gal;
 using Ryujinx.Graphics.Gal.OpenGL;
+using Ryujinx.Graphics.Gal.Vulkan;
 using Ryujinx.HLE;
+using Ryujinx.HLE.Logging;
 using System;
 using System.IO;
 
@@ -14,13 +16,15 @@ namespace Ryujinx
         {
             Console.Title = "Ryujinx Console";
 
-            IGalRenderer Renderer = new OGLRenderer();
+            Logger Log = new Logger();
+
+            Config.Read(Log);
+
+            IGalRenderer Renderer = CreateRenderer();
 
             IAalOutput AudioOut = new OpenALAudioOut();
 
-            Switch Ns = new Switch(Renderer, AudioOut);
-
-            Config.Read(Ns.Log);
+            Switch Ns = new Switch(Log, Renderer, AudioOut);
 
             Ns.Log.Updated += ConsoleLog.PrintLog;
 
@@ -60,7 +64,7 @@ namespace Ryujinx
                 Console.WriteLine("Please specify the folder with the NSOs/IStorage or a NSO/NRO.");
             }
 
-            using (Screen Screen = new GLScreen(Ns, Renderer))
+            using (Screen Screen = CreateScreen(Ns, Renderer))
             {
                 Screen.MainLoop();
 
@@ -68,6 +72,32 @@ namespace Ryujinx
             }
 
             Environment.Exit(0);
+        }
+
+        static IGalRenderer CreateRenderer()
+        {
+            switch (Config.GraphicsAPI)
+            {
+                case GraphicsAPI.OpenGL:
+                    return new OGLRenderer();
+
+                case GraphicsAPI.Vulkan:
+                    return new VulkanRenderer();
+
+                default:
+                    throw new InvalidOperationException();
+            }
+        }
+
+        static Screen CreateScreen(Switch Ns, IGalRenderer Renderer)
+        {
+            switch (Config.GraphicsAPI)
+            {
+                case GraphicsAPI.OpenGL: return new GLScreen(Ns, Renderer);
+                case GraphicsAPI.Vulkan: return new VKScreen(Ns, Renderer);
+
+                default: throw new InvalidOperationException();
+            }
         }
     }
 }

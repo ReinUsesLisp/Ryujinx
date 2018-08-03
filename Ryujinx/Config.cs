@@ -14,6 +14,8 @@ namespace Ryujinx
         public static JoyConKeyboard   JoyConKeyboard   { get; private set; }
         public static JoyConController JoyConController { get; private set; }
 
+        public static GraphicsAPI GraphicsAPI { get; private set; }
+
         public static void Read(Logger Log)
         {
             string IniFolder = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
@@ -23,6 +25,8 @@ namespace Ryujinx
             IniParser Parser = new IniParser(IniPath);
 
             AOptimizations.DisableMemoryChecks = !Convert.ToBoolean(Parser.Value("Enable_Memory_Checks"));
+
+            GraphicsAPI = ToAPI(Parser.Value("Graphics_API"));
 
             GraphicsConfig.ShadersDumpPath = Parser.Value("Graphics_Shaders_Dump_Path");
 
@@ -126,6 +130,18 @@ namespace Ryujinx
                     ButtonR     = ToID(Parser.Value("Controls_Right_JoyConController_Button_R")),
                     ButtonZR    = ToID(Parser.Value("Controls_Right_JoyConController_Button_ZR"))
                 });
+        }
+
+        private static GraphicsAPI ToAPI(string Key)
+        {
+            switch (Key.ToUpper())
+            {
+                case "OPENGL": return GraphicsAPI.OpenGL;
+                case "VULKAN": return GraphicsAPI.Vulkan;
+
+                default:
+                    return GraphicsAPI.OpenGL;
+            }
         }
 
         private static ControllerInputID ToID(string Key)

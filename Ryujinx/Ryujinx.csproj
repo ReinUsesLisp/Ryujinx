@@ -6,8 +6,8 @@
     <RuntimeIdentifiers>win10-x64;osx-x64;linux-x64</RuntimeIdentifiers>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="OpenTK.NetStandard" Version="1.0.4" />
-    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="4.4.0" />
+    <PackageReference Include="OpenTK.NetStandard" Version="1.0.6-prerelease" />
+    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="4.5.0" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ChocolArm64\ChocolArm64.csproj" />

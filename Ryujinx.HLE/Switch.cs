@@ -29,21 +29,16 @@ namespace Ryujinx.HLE
 
         public event EventHandler Finish;
 
-        public Switch(IGalRenderer Renderer, IAalOutput AudioOut)
+        public Switch(Logger Log, IGalRenderer Renderer, IAalOutput AudioOut)
         {
             if (Renderer == null)
             {
                 throw new ArgumentNullException(nameof(Renderer));
             }
 
-            if (AudioOut == null)
-            {
-                throw new ArgumentNullException(nameof(AudioOut));
-            }
+            this.Log = Log ?? throw new ArgumentNullException(nameof(Log));
 
-            this.AudioOut = AudioOut;
-
-            Log = new Logger();
+            this.AudioOut = AudioOut ?? throw new ArgumentNullException(nameof(AudioOut));
 
             Gpu = new NvGpu(Renderer);
 
