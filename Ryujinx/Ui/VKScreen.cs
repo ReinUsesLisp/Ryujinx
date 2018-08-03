@@ -31,7 +31,6 @@ namespace Ryujinx
 
         protected override void Resized()
         {
-            VKRenderer.RecreateSwapchain(Width, Height);
         }
 
         protected override void Dispose()

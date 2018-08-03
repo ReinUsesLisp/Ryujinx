@@ -34,8 +34,6 @@ namespace Ryujinx
             (Context as IGraphicsContextInternal).LoadAll();
 
             Context.SwapInterval = 0;
-
-            Renderer.FrameBuffer.SetWindowSize(Width, Height);
         }
 
         protected override void SwapBuffers()
