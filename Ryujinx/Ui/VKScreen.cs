@@ -31,9 +31,10 @@ namespace Ryujinx
 
         protected override void Resized()
         {
+            VKRenderer.FrameBuffer.SetWindowSize(Width, Height);
         }
 
-        protected override void Dispose()
+        protected override void Shutdown()
         {
             VKRenderer.Dispose();
         }

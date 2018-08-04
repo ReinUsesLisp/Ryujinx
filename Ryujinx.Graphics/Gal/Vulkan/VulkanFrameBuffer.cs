@@ -1,5 +1,6 @@
 ﻿using OpenTK.Graphics.Vulkan;
 using System;
+using System.Runtime.InteropServices;
 
 namespace Ryujinx.Graphics.Gal.Vulkan
 {
@@ -28,38 +29,38 @@ namespace Ryujinx.Graphics.Gal.Vulkan
             public int Width { get; set; }
             public int Height { get; set; }
 
+            public VkImage Image;
+            public VkDeviceMemory Memory;
+
             public FrameBuffer(int Width, int Height)
             {
-                this.Width  = Width;
-                this.Height = Height;    
+                this.Width = Width;
+                this.Height = Height;
             }
         }
 
-        private const int NativeWidth  = 1280;
+        private const int NativeWidth = 1280;
         private const int NativeHeight = 720;
 
-        private VulkanSemaphores Semaphores;
+        private VulkanDeviceQuery DeviceQuery;
+        private VulkanSynchronization Synchronization;
 
-        private VkSurfaceKHR Surface;
-        private VkPhysicalDevice PhysicalDevice;
-        private VkDevice Device;
-        private VkQueue PresentQueue;
+        private readonly VkSurfaceKHR Surface;
+        private readonly VkPhysicalDevice PhysicalDevice;
+        private readonly VkDevice Device;
+        private readonly VkQueue GraphicsQueue;
+        private readonly VkQueue PresentQueue;
+        private readonly VkCommandPool CommandPool;
 
-        private bool HasSwapChain;
-        private VkSwapchainKHR SwapChain;
-        private VulkanList<VkImage> SwapChainImages;
-        private VkFormat SwapChainImageFormat;
-        private VkExtent2D SwapChainExtent;
-        private VulkanList<VkImageView> SwapChainImageViews;
-        private VkRenderPass RenderPass;
-        private VulkanList<VkFramebuffer> SwapChainFrameBuffers;
+        private VulkanSwapChain SwapChain;
 
-        private VkSemaphore PresentComplete;
-
-        private FrameBuffer CurrFb;
-        private FrameBuffer CurrReadFb;
+        private VkSemaphore PresentCompleteSemaphore;
+        private uint ImageIndex;
 
         private Rect Window;
+
+        private FrameBuffer CurrReadFb;
+        private FrameBuffer RawFb;
 
         private bool FlipX;
         private bool FlipY;
@@ -70,24 +71,34 @@ namespace Ryujinx.Graphics.Gal.Vulkan
         private int CropBottom;
 
         public VulkanFrameBuffer(
-            VulkanSemaphores Semaphores,
+            VulkanDeviceQuery DeviceQuery,
+            VulkanSynchronization Synchronization,
             VkSurfaceKHR Surface,
             VkPhysicalDevice PhysicalDevice,
             VkDevice Device,
-            VkQueue PresentQueue)
+            VkQueue GraphicsQueue,
+            VkQueue PresentQueue,
+            VkCommandPool CommandPool)
         {
-            this.Semaphores     = Semaphores;
-            this.Surface        = Surface;
+            this.DeviceQuery = DeviceQuery;
+            this.Synchronization = Synchronization;
+            this.Surface = Surface;
             this.PhysicalDevice = PhysicalDevice;
-            this.Device         = Device;
-            this.PresentQueue   = PresentQueue;
+            this.Device = Device;
+            this.GraphicsQueue = GraphicsQueue;
+            this.PresentQueue = PresentQueue;
+            this.CommandPool = CommandPool;
+
+            SwapChain = new VulkanSwapChain(PhysicalDevice, Device, Surface);
 
             VkSemaphoreCreateInfo SemaphoreCI = VkSemaphoreCreateInfo.New();
 
-            unsafe
-            {
-                Check(VK.CreateSemaphore(Device, &SemaphoreCI, IntPtr.Zero, out PresentComplete));
-            }
+            Check(VK.CreateSemaphore(Device, ref SemaphoreCI, IntPtr.Zero, out PresentCompleteSemaphore));
+        }
+
+        public void Dispose()
+        {
+            VK.DestroySemaphore(Device, PresentCompleteSemaphore, IntPtr.Zero);
         }
 
         public void Bind(long Key)
@@ -117,60 +128,152 @@ namespace Ryujinx.Graphics.Gal.Vulkan
 
         public unsafe void Render()
         {
-            throw new NotImplementedException();
+            if (CurrReadFb == null)
+            {
+                //Always clear the screen, validation layers will ask for a PresentSrcKHR otherwise
+
+                VkClearValue ClearValue = new VkClearValue()
+                {
+                    color = new VkClearColorValue(0f, 0f, 0f, 1f)
+                };
+
+                VkRenderPassBeginInfo RenderPassBI = new VkRenderPassBeginInfo()
+                {
+                    sType = VkStructureType.RenderPassBeginInfo,
+                    renderPass = SwapChain.RenderPass,
+                    framebuffer = SwapChain.Framebuffers[ImageIndex],
+                    renderArea = new VkRect2D((uint)Window.Width, (uint)Window.Height),
+                    clearValueCount = 1,
+                    pClearValues = &ClearValue
+                };
+
+                VkCommandBuffer ClearCmd = Synchronization.BeginRecord();
+
+                VK.CmdBeginRenderPass(ClearCmd, ref RenderPassBI, VkSubpassContents.Inline);
+
+                VK.CmdEndRenderPass(ClearCmd);
+
+                Check(VK.EndCommandBuffer(ClearCmd));
+
+                Synchronization.Execute(GraphicsQueue);
+
+                return;
+            }
+
+            int SrcX0, SrcX1, SrcY0, SrcY1;
+
+            if (CropLeft == 0 && CropRight == 0)
+            {
+                SrcX0 = 0;
+                SrcX1 = CurrReadFb.Width;
+            }
+            else
+            {
+                SrcX0 = CropLeft;
+                SrcX1 = CropRight;
+            }
+
+            if (CropTop == 0 && CropBottom == 0)
+            {
+                SrcY0 = 0;
+                SrcY1 = CurrReadFb.Height;
+            }
+            else
+            {
+                SrcY0 = CropTop;
+                SrcY1 = CropBottom;
+            }
+
+            float RatioX = MathF.Min(1f, (Window.Height * (float)NativeWidth) / ((float)NativeHeight * Window.Width));
+            float RatioY = MathF.Min(1f, (Window.Width * (float)NativeHeight) / ((float)NativeWidth * Window.Height));
+
+            int DstWidth = (int)(Window.Width * RatioX);
+            int DstHeight = (int)(Window.Height * RatioY);
+
+            int DstPaddingX = (Window.Width - DstWidth) / 2;
+            int DstPaddingY = (Window.Height - DstHeight) / 2;
+
+            int DstX0 = FlipX ? Window.Width - DstPaddingX : DstPaddingX;
+            int DstX1 = FlipX ? DstPaddingX : Window.Width - DstPaddingX;
+
+            int DstY0 = FlipY ? Window.Height - DstPaddingY : DstPaddingY;
+            int DstY1 = FlipY ? DstPaddingY : Window.Height - DstPaddingY;
+
+            //Record
+            VkCommandBuffer BlitCmd = Synchronization.BeginRecord();
+
+            VkImageSubresourceLayers Subresource = new VkImageSubresourceLayers()
+            {
+                aspectMask = VkImageAspectFlags.Color,
+                baseArrayLayer = 0,
+                layerCount = 1,
+                mipLevel = 0
+            };
+
+            VkImageBlit Region = new VkImageBlit()
+            {
+                srcSubresource = Subresource,
+                srcOffsets_0 = new VkOffset3D() { x = SrcX0, y = SrcY0, z = 0 },
+                srcOffsets_1 = new VkOffset3D() { x = SrcX1, y = SrcY1, z = 1 },
+
+                dstSubresource = Subresource,
+                dstOffsets_0 = new VkOffset3D() { x = DstX0, y = DstY0, z = 0 },
+                dstOffsets_1 = new VkOffset3D() { x = DstX1, y = DstY1, z = 1 }
+            };
+
+            SetImageLayout(
+                BlitCmd,
+                SwapChain.Images[ImageIndex],
+                VkImageAspectFlags.Color,
+                VkImageLayout.Undefined,
+                VkImageLayout.TransferDstOptimal,
+                VkPipelineStageFlags.Transfer,
+                VkPipelineStageFlags.Transfer);
+
+            SetImageLayout(
+                BlitCmd,
+                CurrReadFb.Image,
+                VkImageAspectFlags.Color,
+                VkImageLayout.Undefined,
+                VkImageLayout.TransferSrcOptimal,
+                VkPipelineStageFlags.Transfer,
+                VkPipelineStageFlags.Transfer);
+
+            VK.CmdBlitImage(
+                BlitCmd,
+                CurrReadFb.Image,
+                VkImageLayout.TransferSrcOptimal,
+                SwapChain.Images[ImageIndex],
+                VkImageLayout.TransferDstOptimal,
+                1, &Region,
+                VkFilter.Linear);
+
+            SetImageLayout(
+                BlitCmd,
+                SwapChain.Images[ImageIndex],
+                VkImageAspectFlags.Color,
+                VkImageLayout.TransferDstOptimal,
+                VkImageLayout.PresentSrcKHR,
+                VkPipelineStageFlags.Transfer,
+                VkPipelineStageFlags.Transfer);
+
+            Check(VK.EndCommandBuffer(BlitCmd));
+
+            //Send to queue
+            Synchronization.Execute(GraphicsQueue);
         }
 
         public unsafe void SwapBuffers()
         {
-            if (!HasSwapChain)
-            {
-                return;
-            }
+            /*VK.QueueWaitIdle(GraphicsQueue);
+            VK.QueueWaitIdle(PresentQueue);
+            VK.DeviceWaitIdle(Device);*/
 
-            VkSwapchainKHR SwapChain = this.SwapChain;
+            ImageIndex = SwapChain.AcquireNextImage(PresentCompleteSemaphore);
 
-            uint ImageIndex;
-            VkResult Result = VK.AcquireNextImageKHR(Device, SwapChain, ulong.MaxValue, PresentComplete, VkFence.Null, &ImageIndex);
+            Render();
 
-            if (Result == VkResult.ErrorOutOfDateKHR || Result == VkResult.SuboptimalKHR)
-            {
-                RecreateSwapChain();
-            }
-            else
-            {
-                Check(Result);
-            }
-
-            VkPresentInfoKHR PresentInfo = new VkPresentInfoKHR()
-            {
-                sType = VkStructureType.PresentInfoKHR,
-                swapchainCount = 1,
-                pSwapchains = &SwapChain,
-                pImageIndices = &ImageIndex
-            };
-
-            VkSemaphore WaitRender = Semaphores.Pop();
-
-            if (WaitRender != VkSemaphore.Null)
-            {
-                PresentInfo.waitSemaphoreCount = 1;
-                PresentInfo.pWaitSemaphores = &WaitRender;
-            }
-
-            Result = VK.QueuePresentKHR(PresentQueue, &PresentInfo);
-
-            if (Result == VkResult.ErrorOutOfDateKHR)
-            {
-                RecreateSwapChain();
-                return;
-            }
-            else
-            {
-                Check(Result);
-            }
-
-            //FIXME: Wait am I waiting here?
-            Check(VK.QueueWaitIdle(PresentQueue));
+            SwapChain.QueuePresent(PresentQueue, ImageIndex, PresentCompleteSemaphore, Synchronization.QuerySemaphore());
         }
 
         public void Set(long Key)
@@ -178,9 +281,111 @@ namespace Ryujinx.Graphics.Gal.Vulkan
             throw new NotImplementedException();
         }
 
-        public void Set(byte[] Data, int Width, int Height)
+        private VkDeviceMemory SetBufferMemory;
+        private VkBuffer SetBuffer;
+        private int SetBufferSize;
+
+        public unsafe void Set(byte[] Data, int Width, int Height)
         {
-            throw new NotImplementedException();
+            if (RawFb == null || RawFb.Width != Width || RawFb.Height != Height)
+            {
+                CreateRawFb(Width, Height);
+            }
+
+            //FIXME: Query this in constructor
+            uint GraphicsFamily = (uint)QueueFamilyIndices.Find(PhysicalDevice, Surface).GraphicsFamily;
+
+            if (Width * Height * 4 > SetBufferSize)
+            {
+                if (SetBufferMemory != VkDeviceMemory.Null)
+                {
+                    //TODO: Is it really needed to wait here?
+                    VK.DeviceWaitIdle(Device);
+
+                    VK.DestroyBuffer(Device, SetBuffer, IntPtr.Zero);
+
+                    VK.FreeMemory(Device, SetBufferMemory, IntPtr.Zero);
+                }
+
+                SetBufferSize = Width * Height * 4;
+
+                VkBufferCreateInfo BufferCI = new VkBufferCreateInfo()
+                {
+                    sType = VkStructureType.BufferCreateInfo,
+                    flags = VkBufferCreateFlags.None,
+                    sharingMode = VkSharingMode.Exclusive,
+                    queueFamilyIndexCount = 1,
+                    pQueueFamilyIndices = &GraphicsFamily,
+                    size = (ulong)SetBufferSize,
+                    usage = VkBufferUsageFlags.TransferSrc
+                };
+
+                Check(VK.CreateBuffer(Device, ref BufferCI, IntPtr.Zero, out SetBuffer));
+
+                VK.GetBufferMemoryRequirements(Device, SetBuffer, out VkMemoryRequirements MemoryRequeriments);
+
+                VkMemoryAllocateInfo MemoryAI = new VkMemoryAllocateInfo()
+                {
+                    sType = VkStructureType.MemoryAllocateInfo,
+                    allocationSize = MemoryRequeriments.size,
+                    memoryTypeIndex = DeviceQuery.GetMemoryTypeIndex(MemoryRequeriments.memoryTypeBits, VkMemoryPropertyFlags.HostVisible | VkMemoryPropertyFlags.HostCoherent)
+                };
+
+                Check(VK.AllocateMemory(Device, ref MemoryAI, IntPtr.Zero, out SetBufferMemory));
+
+                Check(VK.BindBufferMemory(Device, SetBuffer, SetBufferMemory, 0));
+            }
+
+            IntPtr MapAddress;
+
+            Check(VK.MapMemory(Device, SetBufferMemory, 0, (ulong)(Width * Height * 4), 0, (void**)&MapAddress));
+
+            Marshal.Copy(Data, 0, MapAddress, Width * Height * 4);
+
+            VK.UnmapMemory(Device, SetBufferMemory);
+
+            //Record
+            VkCommandBuffer SetCmd = Synchronization.BeginRecord();
+
+            VkBufferImageCopy Region = new VkBufferImageCopy()
+            {
+                bufferRowLength = (uint)Width,
+                bufferImageHeight = (uint)Height,
+                imageExtent = new VkExtent3D()
+                {
+                    width = (uint)RawFb.Width,
+                    height = (uint)RawFb.Height,
+                    depth = 1
+                },
+                imageSubresource = new VkImageSubresourceLayers()
+                {
+                    mipLevel = 0,
+                    baseArrayLayer = 0,
+                    layerCount = 1,
+                    aspectMask = VkImageAspectFlags.Color
+                },
+                bufferOffset = 0,
+                imageOffset = new VkOffset3D()
+            };
+
+            VkImageLayout NewLayout = VkImageLayout.TransferSrcOptimal | VkImageLayout.TransferDstOptimal;
+
+            SetImageLayout(
+                SetCmd,
+                RawFb.Image,
+                VkImageAspectFlags.Color,
+                VkImageLayout.Undefined,
+                NewLayout,
+                VkPipelineStageFlags.Host,
+                VkPipelineStageFlags.Transfer);
+
+            VK.CmdCopyBufferToImage(SetCmd, SetBuffer, RawFb.Image, NewLayout, 1, ref Region);
+
+            Check(VK.EndCommandBuffer(SetCmd));
+
+            Synchronization.Execute(GraphicsQueue);
+
+            CurrReadFb = RawFb;
         }
 
         public void SetBufferData(long Key, int Width, int Height, GalTextureFormat Format, byte[] Buffer)
@@ -193,9 +398,9 @@ namespace Ryujinx.Graphics.Gal.Vulkan
             this.FlipX = FlipX;
             this.FlipY = FlipY;
 
-            CropTop    = Top;
-            CropLeft   = Left;
-            CropRight  = Right;
+            CropTop = Top;
+            CropLeft = Left;
+            CropRight = Right;
             CropBottom = Bottom;
         }
 
@@ -208,290 +413,64 @@ namespace Ryujinx.Graphics.Gal.Vulkan
         {
             Window = new Rect(0, 0, Width, Height);
 
-            RecreateSwapChain();
+            if (Width > 0 && Height > 0)
+            {
+                SwapChain.Create(Width, Height);
+            }
         }
 
-        private void RecreateSwapChain()
+        private unsafe void CreateRawFb(int Width, int Height)
         {
-            VK.DeviceWaitIdle(Device);
-
-            CleanupSwapChain();
-
-            if (Window.Width > 0 && Window.Height > 0)
+            if (RawFb != null)
             {
-                if (CreateSwapChain())
+                //TODO: Avoid halting here
+                //TODO: Avoid reallocating memory when not needed (e.g. shrinking)
+
+                VK.DeviceWaitIdle(Device);
+
+                VK.FreeMemory(Device, RawFb.Memory, IntPtr.Zero);
+
+                VK.DestroyImage(Device, RawFb.Image, IntPtr.Zero);
+            }
+
+            RawFb = new FrameBuffer(Width, Height);
+
+            VkImageCreateInfo ImageCI = new VkImageCreateInfo()
+            {
+                sType = VkStructureType.ImageCreateInfo,
+
+                flags = VkImageCreateFlags.None,
+                imageType = VkImageType.Image2D,
+                format = VkFormat.R8g8b8a8Unorm,
+                extent = new VkExtent3D()
                 {
-                    CreateImageViews();
-                    CreateFrameBuffers();
-
-                    HasSwapChain = true;
-                }
-            }
-        }
-
-        private void CleanupSwapChain()
-        {
-            if (!HasSwapChain)
-            {
-                return;
-            }
-
-            foreach (VkFramebuffer Framebuffer in SwapChainFrameBuffers)
-            {
-                VK.DestroyFramebuffer(Device, Framebuffer, IntPtr.Zero);
-            }
-
-            VK.DestroyRenderPass(Device, RenderPass, IntPtr.Zero);
-
-            foreach (VkImageView ImageView in SwapChainImageViews)
-            {
-                VK.DestroyImageView(Device, ImageView, IntPtr.Zero);
-            }
-
-            VK.DestroySwapchainKHR(Device, SwapChain, IntPtr.Zero);
-
-            HasSwapChain = false;
-        }
-
-        private unsafe bool CreateSwapChain()
-        {
-            SwapChainSupportDetails SwapChainSupport = SwapChainSupportDetails.Query(PhysicalDevice, Surface);
-
-            VkSurfaceFormatKHR SurfaceFormat = ChooseSwapSurfaceFormat(SwapChainSupport.Formats);
-            VkPresentModeKHR PresentMode     = ChooseSwapPresentMode(SwapChainSupport.PresentModes);
-            VkExtent2D Extent                = ChooseSwapExtent(SwapChainSupport.Capabilities);
-
-            uint ImageCount = SwapChainSupport.Capabilities.minImageCount + 1;
-
-            if (SwapChainSupport.Capabilities.maxImageCount > 0 &&
-                ImageCount > SwapChainSupport.Capabilities.maxImageCount)
-            {
-                ImageCount = SwapChainSupport.Capabilities.maxImageCount;
-            }
-
-            VkSwapchainCreateInfoKHR CreateInfo = new VkSwapchainCreateInfoKHR()
-            {
-                sType = VkStructureType.SwapchainCreateInfoKHR,
-                surface = Surface,
-                minImageCount = ImageCount,
-                imageFormat = SurfaceFormat.format,
-                imageColorSpace = SurfaceFormat.colorSpace,
-                imageExtent = Extent,
-                imageArrayLayers = 1,
-                imageUsage = VkImageUsageFlags.ColorAttachment,
-                preTransform = SwapChainSupport.Capabilities.currentTransform,
-                compositeAlpha = VkCompositeAlphaFlagsKHR.OpaqueKHR,
-                presentMode = PresentMode,
-                clipped = true,
-                oldSwapchain = VkSwapchainKHR.Null
-            };
-
-            QueueFamilyIndices Indices = QueueFamilyIndices.Find(PhysicalDevice, Surface);
-
-            if (Indices.GraphicsFamily != Indices.PresentFamily)
-            {
-                VulkanList<uint> QueueFamilyIndices = new VulkanList<uint>()
-                {
-                    (uint)Indices.GraphicsFamily,
-                    (uint)Indices.PresentFamily
-                };
-
-                CreateInfo.imageSharingMode = VkSharingMode.Concurrent;
-                CreateInfo.queueFamilyIndexCount = 2;
-                CreateInfo.pQueueFamilyIndices = (uint*)QueueFamilyIndices.Data;
-            }
-            else
-            {
-                CreateInfo.imageSharingMode = VkSharingMode.Exclusive;
-            }
-
-            if (VK.CreateSwapchainKHR(Device, &CreateInfo, IntPtr.Zero, out SwapChain) != VkResult.Success)
-            {
-                return false;
-            }
-
-            uint SwapChainImageCount = 0;
-            Check(VK.GetSwapchainImagesKHR(Device, SwapChain, ref SwapChainImageCount, (VkImage*)null));
-
-            SwapChainImages = new VulkanList<VkImage>(SwapChainImageCount, SwapChainImageCount);
-            Check(VK.GetSwapchainImagesKHR(Device, SwapChain, ref SwapChainImageCount, (VkImage*)SwapChainImages.Data));
-
-            SwapChainImageFormat = SurfaceFormat.format;
-            SwapChainExtent = Extent;
-
-            return true;
-        }
-
-        private unsafe void CreateImageViews()
-        {
-            SwapChainImageViews = new VulkanList<VkImageView>(SwapChainImages.Count, SwapChainImages.Count);
-
-            for (int i = 0; i < SwapChainImageViews.Count; i++)
-            {
-                VkImageViewCreateInfo CreateInfo = new VkImageViewCreateInfo
-                {
-                    sType = VkStructureType.ImageViewCreateInfo,
-                    image = SwapChainImages[i],
-                    viewType = VkImageViewType.Image2D,
-                    format = SwapChainImageFormat,
-                    components = new VkComponentMapping
-                    {
-                        r = VkComponentSwizzle.Identity,
-                        g = VkComponentSwizzle.Identity,
-                        b = VkComponentSwizzle.Identity,
-                        a = VkComponentSwizzle.Identity
-                    },
-                    subresourceRange = new VkImageSubresourceRange
-                    {
-                        aspectMask = VkImageAspectFlags.Color,
-                        baseMipLevel = 0,
-                        levelCount = 1,
-                        baseArrayLayer = 0,
-                        layerCount = 1
-                    }
-                };
-
-                Check(VK.CreateImageView(Device, &CreateInfo, IntPtr.Zero, out VkImageView View));
-
-                SwapChainImageViews[i] = View;
-            }
-        }
-
-        private unsafe void CreateRenderPass()
-        {
-            VkAttachmentDescription ColorAttachment = new VkAttachmentDescription
-            {
-                format = SwapChainImageFormat,
+                    width = (uint)Width,
+                    height = (uint)Height,
+                    depth = 1
+                },
+                mipLevels = 1,
+                arrayLayers = 1,
                 samples = VkSampleCountFlags.Count1,
-                loadOp = VkAttachmentLoadOp.Clear,
-                storeOp = VkAttachmentStoreOp.Store,
-                stencilLoadOp = VkAttachmentLoadOp.DontCare,
-                stencilStoreOp = VkAttachmentStoreOp.DontCare,
-                initialLayout = VkImageLayout.Undefined,
-                finalLayout = VkImageLayout.PresentSrcKHR
+                tiling = VkImageTiling.Optimal,
+                usage = VkImageUsageFlags.ColorAttachment | VkImageUsageFlags.TransferDst | VkImageUsageFlags.TransferSrc,
+                sharingMode = VkSharingMode.Exclusive,
+                initialLayout = VkImageLayout.Undefined
             };
 
-            VkAttachmentReference ColorAttachmentRef = new VkAttachmentReference
+            Check(VK.CreateImage(Device, &ImageCI, IntPtr.Zero, out RawFb.Image));
+
+            VK.GetImageMemoryRequirements(Device, RawFb.Image, out VkMemoryRequirements MemoryRequirements);
+
+            VkMemoryAllocateInfo MemoryAI = new VkMemoryAllocateInfo()
             {
-                attachment = 0,
-                layout = VkImageLayout.ColorAttachmentOptimal
+                sType = VkStructureType.MemoryAllocateInfo,
+                allocationSize = MemoryRequirements.size,
+                memoryTypeIndex = DeviceQuery.GetMemoryTypeIndex(MemoryRequirements.memoryTypeBits, VkMemoryPropertyFlags.DeviceLocal)
             };
 
-            VkSubpassDescription Subpass = new VkSubpassDescription
-            {
-                pipelineBindPoint = VkPipelineBindPoint.Graphics,
-                colorAttachmentCount = 1,
-                pColorAttachments = &ColorAttachmentRef
-            };
+            VK.AllocateMemory(Device, ref MemoryAI, IntPtr.Zero, out RawFb.Memory);
 
-            VkSubpassDependency Dependency = new VkSubpassDependency()
-            {
-                srcSubpass = VK.SubpassExternal,
-                dstSubpass = 0,
-                srcStageMask = VkPipelineStageFlags.ColorAttachmentOutput,
-                srcAccessMask = 0,
-                dstStageMask = VkPipelineStageFlags.ColorAttachmentOutput,
-                dstAccessMask = VkAccessFlags.ColorAttachmentRead | VkAccessFlags.ColorAttachmentWrite,
-            };
-
-            VkRenderPassCreateInfo RenderPassInfo = new VkRenderPassCreateInfo
-            {
-                sType = VkStructureType.RenderPassCreateInfo,
-                attachmentCount = 1,
-                pAttachments = &ColorAttachment,
-                subpassCount = 1,
-                pSubpasses = &Subpass,
-                dependencyCount = 1,
-                pDependencies = &Dependency
-            };
-
-            Check(VK.CreateRenderPass(Device, &RenderPassInfo, IntPtr.Zero, out RenderPass));
-        }
-
-        private unsafe void CreateFrameBuffers()
-        {
-            SwapChainFrameBuffers = new VulkanList<VkFramebuffer>(SwapChainImageViews.Count);
-
-            for (int i = 0; i < SwapChainImageViews.Count; i++)
-            {
-                VulkanList<VkImageView> Attachments = new VulkanList<VkImageView>
-                {
-                    SwapChainImageViews[i]
-                };
-
-                VkFramebufferCreateInfo FramebufferInfo = new VkFramebufferCreateInfo
-                {
-                    sType = VkStructureType.FramebufferCreateInfo,
-                    renderPass = RenderPass,
-                    attachmentCount = 1,
-                    pAttachments = (VkImageView*)Attachments.Data,
-                    width = SwapChainExtent.width,
-                    height = SwapChainExtent.height,
-                    layers = 1
-                };
-
-                Check(VK.CreateFramebuffer(Device, &FramebufferInfo, IntPtr.Zero, out VkFramebuffer Framebuffer));
-
-                SwapChainFrameBuffers.Add(Framebuffer);
-            }
-        }
-
-        private unsafe VkExtent2D ChooseSwapExtent(VkSurfaceCapabilitiesKHR Capabilities)
-        {
-            if (Capabilities.currentExtent.width != UInt32.MaxValue)
-            {
-                return Capabilities.currentExtent;
-            }
-            else
-            {
-                return new VkExtent2D
-                {
-                    width  = (uint)Window.Width,
-                    height = (uint)Window.Height
-                };
-            }
-        }
-
-        private unsafe VkPresentModeKHR ChooseSwapPresentMode(VulkanList<VkPresentModeKHR> AvailablePresentModes)
-        {
-            VkPresentModeKHR BestMode = VkPresentModeKHR.FifoKHR;
-
-            foreach (VkPresentModeKHR AvailablePresentMode in AvailablePresentModes)
-            {
-                if (AvailablePresentMode == VkPresentModeKHR.MailboxKHR)
-                {
-                    return AvailablePresentMode;
-                }
-                else if (AvailablePresentMode == VkPresentModeKHR.ImmediateKHR)
-                {
-                    BestMode = AvailablePresentMode;
-                }
-            }
-
-            return BestMode;
-        }
-
-        private unsafe VkSurfaceFormatKHR ChooseSwapSurfaceFormat(VulkanList<VkSurfaceFormatKHR> AvailableFormats)
-        {
-            if (AvailableFormats.Count == 1 && AvailableFormats[0].format == VkFormat.Undefined)
-            {
-                return new VkSurfaceFormatKHR()
-                {
-                    format = VkFormat.B8g8r8a8Unorm,
-                    colorSpace = VkColorSpaceKHR.SrgbNonlinearKHR
-                };
-            }
-
-            foreach (VkSurfaceFormatKHR AvailableFormat in AvailableFormats)
-            {
-                if (AvailableFormat.format == VkFormat.B8g8r8a8Unorm &&
-                    AvailableFormat.colorSpace == VkColorSpaceKHR.SrgbNonlinearKHR)
-                {
-                    return AvailableFormat;
-                }
-            }
-
-            return AvailableFormats[0];
+            VK.BindImageMemory(Device, RawFb.Image, RawFb.Memory, 0);
         }
     }
 }

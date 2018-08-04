@@ -38,6 +38,8 @@ namespace Ryujinx
 
         protected override void SwapBuffers()
         {
+            Renderer.FrameBuffer.Render();
+
             Context.SwapBuffers();
         }
 
@@ -46,7 +48,7 @@ namespace Ryujinx
             Context.Update(WindowInfo);
         }
 
-        protected override void Dispose()
+        protected override void Shutdown()
         {
             Context.Dispose();
         }

@@ -38,6 +38,8 @@ namespace Ryujinx
 
         private bool Quit;
 
+        private object SwapLock = new object();
+
         public Screen(Switch Ns, IGalRenderer Renderer, GraphicsMode GraphicsMode)
             : base(1280, 720, "Ryujinx",
                   GameWindowFlags.Default,
@@ -94,7 +96,10 @@ namespace Ryujinx
                 {
                     ResizeEvent = false;
 
-                    Renderer.FrameBuffer.SetWindowSize(Width, Height);
+                    lock (SwapLock)
+                    {
+                        Renderer.FrameBuffer.SetWindowSize(Width, Height);
+                    }
                 }
 
                 Ticks += Chrono.ElapsedTicks;
@@ -109,8 +114,6 @@ namespace Ryujinx
                     Ticks = Math.Min(Ticks - TicksPerFrame, TicksPerFrame);
                 }
             }
-
-            RenderThread.Join();
         }
 
         public void MainLoop()
@@ -130,7 +133,10 @@ namespace Ryujinx
 
             while (Exists && !Quit)
             {
-                ProcessEvents();
+                lock (SwapLock)
+                {
+                    ProcessEvents();
+                }
 
                 if (!Quit)
                 {
@@ -148,7 +154,9 @@ namespace Ryujinx
                 Thread.Sleep(1);
             }
 
-            Dispose();
+            RenderThread.Join();
+
+            Shutdown();
         }
 
         private void UpdateFrame()
@@ -276,20 +284,26 @@ namespace Ryujinx
 
         private void RenderFrame()
         {
-            Renderer.FrameBuffer.Render();
+            //Renderer.FrameBuffer.Render();
 
             Ns.Statistics.RecordSystemFrameTime();
 
             double HostFps = Ns.Statistics.GetSystemFrameRate();
             double GameFps = Ns.Statistics.GetGameFrameRate();
 
-            NewTitle = $"Ryujinx | Host FPS: {HostFps:0.0} | Game FPS: {GameFps:0.0}";
+            NewTitle = $"Ryujinx | Host FPS: {HostFps:0.0} | Game FPS: {GameFps:0.0} ({Config.GraphicsAPI})";
 
             TitleEvent = true;
 
-            SwapBuffers();
+            lock (SwapLock)
+            {
+                if (Width > 0 && Height > 0 && Exists)
+                {
+                    SwapBuffers();
 
-            Ns.Os.SignalVsync();
+                    Ns.Os.SignalVsync();
+                }
+            }
         }
 
         private new void OnKeyDown(KeyboardKeyEventArgs e)
@@ -324,7 +338,7 @@ namespace Ryujinx
 
         protected abstract void PrepareRender();
 
-        protected abstract void Dispose();
+        protected abstract void Shutdown();
 
         protected abstract void SwapBuffers();
 
