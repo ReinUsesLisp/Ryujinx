@@ -21,6 +21,40 @@ namespace Ryujinx.Graphics.Gal.Vulkan
             }
         }
 
+        public static void CreateBuffer(
+            VulkanDeviceQuery DeviceQuery,
+            ulong Size,
+            VkBufferUsageFlags Usage,
+            VkMemoryPropertyFlags Properties,
+            out VkBuffer Buffer,
+            out VkDeviceMemory Memory)
+        {
+            VkDevice Device = DeviceQuery.Device;
+
+            VkBufferCreateInfo BufferCI = new VkBufferCreateInfo()
+            {
+                sType = VkStructureType.BufferCreateInfo,
+                size = Size,
+                usage = Usage,
+                sharingMode = VkSharingMode.Exclusive
+            };
+
+            Check(VK.CreateBuffer(Device, ref BufferCI, IntPtr.Zero, out Buffer));
+
+            VK.GetBufferMemoryRequirements(Device, Buffer, out VkMemoryRequirements MemRequirements);
+
+            VkMemoryAllocateInfo allocInfo = new VkMemoryAllocateInfo()
+            {
+                sType = VkStructureType.MemoryAllocateInfo,
+                allocationSize = MemRequirements.size,
+                memoryTypeIndex = DeviceQuery.GetMemoryTypeIndex(MemRequirements.memoryTypeBits, Properties)
+            };
+
+            Check(VK.AllocateMemory(Device, ref allocInfo, IntPtr.Zero, out Memory));
+
+            VK.BindBufferMemory(Device, Buffer, Memory, 0);
+        }
+
         public static void SetImageLayout(
             VkCommandBuffer CommandBuffer,
             VkImage Image,

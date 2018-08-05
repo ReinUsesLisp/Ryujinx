@@ -5,8 +5,8 @@ namespace Ryujinx.Graphics.Gal.Vulkan
 {
     internal class VulkanDeviceQuery
     {
-        private readonly VkPhysicalDevice PhysicalDevice;
-        private readonly VkDevice Device;
+        public VkPhysicalDevice PhysicalDevice { private set; get; }
+        public VkDevice Device { private set; get; }
 
         private VkPhysicalDeviceMemoryProperties DeviceMemoryProperties;
 

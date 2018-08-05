@@ -8,8 +8,8 @@ namespace Ryujinx.Graphics.Gal.OpenGL
     {
         private int[] VertexBuffers;
 
-        private OGLCachedResource<int> VboCache;
-        private OGLCachedResource<int> IboCache;
+        private CachedResource<int> VboCache;
+        private CachedResource<int> IboCache;
 
         private struct IbInfo
         {
@@ -25,8 +25,8 @@ namespace Ryujinx.Graphics.Gal.OpenGL
         {
             VertexBuffers = new int[32];
 
-            VboCache = new OGLCachedResource<int>(GL.DeleteBuffer);
-            IboCache = new OGLCachedResource<int>(GL.DeleteBuffer);
+            VboCache = new CachedResource<int>(GL.DeleteBuffer);
+            IboCache = new CachedResource<int>(GL.DeleteBuffer);
 
             IndexBuffer = new IbInfo();
         }

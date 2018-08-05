@@ -1,5 +1,6 @@
 ﻿using OpenTK.Graphics.Vulkan;
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
 namespace Ryujinx.Graphics.Gal.Vulkan
@@ -42,6 +43,8 @@ namespace Ryujinx.Graphics.Gal.Vulkan
         private const int NativeWidth = 1280;
         private const int NativeHeight = 720;
 
+        private Dictionary<long, FrameBuffer> Fbs;
+
         private VulkanDeviceQuery DeviceQuery;
         private VulkanSynchronization Synchronization;
 
@@ -51,6 +54,7 @@ namespace Ryujinx.Graphics.Gal.Vulkan
         private readonly VkQueue GraphicsQueue;
         private readonly VkQueue PresentQueue;
         private readonly VkCommandPool CommandPool;
+        private readonly uint GraphicsFamily;
 
         private VulkanSwapChain SwapChain;
 
@@ -89,6 +93,10 @@ namespace Ryujinx.Graphics.Gal.Vulkan
             this.PresentQueue = PresentQueue;
             this.CommandPool = CommandPool;
 
+            Fbs = new Dictionary<long, FrameBuffer>();
+
+            GraphicsFamily = (uint)QueueFamilyIndices.Find(PhysicalDevice, Surface).GraphicsFamily;
+
             SwapChain = new VulkanSwapChain(PhysicalDevice, Device, Surface);
 
             VkSemaphoreCreateInfo SemaphoreCI = VkSemaphoreCreateInfo.New();
@@ -126,7 +134,7 @@ namespace Ryujinx.Graphics.Gal.Vulkan
             throw new NotImplementedException();
         }
 
-        public unsafe void Render()
+        private unsafe void Render()
         {
             if (CurrReadFb == null)
             {
@@ -312,9 +320,6 @@ namespace Ryujinx.Graphics.Gal.Vulkan
                 CreateRawFb(Width, Height);
             }
 
-            //FIXME: Query this in constructor
-            uint GraphicsFamily = (uint)QueueFamilyIndices.Find(PhysicalDevice, Surface).GraphicsFamily;
-
             if (Width * Height * 4 > SetBufferSize)
             {
                 if (SetBufferMemory != VkDeviceMemory.Null)
@@ -328,6 +333,8 @@ namespace Ryujinx.Graphics.Gal.Vulkan
                 }
 
                 SetBufferSize = Width * Height * 4;
+
+                uint GraphicsFamily = this.GraphicsFamily;
 
                 VkBufferCreateInfo BufferCI = new VkBufferCreateInfo()
                 {

@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 
-namespace Ryujinx.Graphics.Gal.OpenGL
+namespace Ryujinx.Graphics.Gal
 {
-    class OGLCachedResource<T>
+    class CachedResource<T>
     {
         public delegate void DeleteValue(T Value);
 
@@ -40,7 +40,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
 
         private bool Locked;
 
-        public OGLCachedResource(DeleteValue DeleteValueCallback)
+        public CachedResource(DeleteValue DeleteValueCallback)
         {
             if (DeleteValueCallback == null)
             {

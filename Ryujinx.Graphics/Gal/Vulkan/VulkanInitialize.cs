@@ -55,7 +55,7 @@ namespace Ryujinx.Graphics.Gal.Vulkan
 
             Synchronization = new VulkanSynchronization(Device, (uint)QueueFamilyIndices.Find(PhysicalDevice, Surface).GraphicsFamily);
 
-            Buffer = new VulkanConstBuffer();
+            Buffer = new VulkanConstBuffer(Synchronization, DeviceQuery, Surface, PhysicalDevice, Device, GraphicsQueue);
 
             FrameBuffer = new VulkanFrameBuffer(DeviceQuery, Synchronization, Surface, PhysicalDevice, Device, GraphicsQueue, PresentQueue, CommandPool);
 

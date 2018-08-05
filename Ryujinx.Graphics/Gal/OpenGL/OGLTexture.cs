@@ -19,11 +19,11 @@ namespace Ryujinx.Graphics.Gal.OpenGL
             }
         }
 
-        private OGLCachedResource<TCE> TextureCache;
+        private CachedResource<TCE> TextureCache;
 
         public OGLTexture()
         {
-            TextureCache = new OGLCachedResource<TCE>(DeleteTexture);
+            TextureCache = new CachedResource<TCE>(DeleteTexture);
         }
 
         public void LockCache()

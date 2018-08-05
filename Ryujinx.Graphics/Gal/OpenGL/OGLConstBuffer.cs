@@ -5,11 +5,11 @@ namespace Ryujinx.Graphics.Gal.OpenGL
 {
     class OGLConstBuffer : IGalConstBuffer
     {
-        private OGLCachedResource<OGLStreamBuffer> Cache;
+        private CachedResource<OGLStreamBuffer> Cache;
 
         public OGLConstBuffer()
         {
-            Cache = new OGLCachedResource<OGLStreamBuffer>(DeleteBuffer);
+            Cache = new CachedResource<OGLStreamBuffer>(DeleteBuffer);
         }
 
         public void LockCache()
