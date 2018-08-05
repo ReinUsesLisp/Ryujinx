@@ -38,7 +38,7 @@ namespace Ryujinx
 
         protected override void SwapBuffers()
         {
-            Renderer.FrameBuffer.Render();
+            Renderer.FrameBuffer.SwapBuffers();
 
             Context.SwapBuffers();
         }

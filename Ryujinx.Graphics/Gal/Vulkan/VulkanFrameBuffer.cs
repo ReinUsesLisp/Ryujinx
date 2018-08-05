@@ -275,6 +275,7 @@ namespace Ryujinx.Graphics.Gal.Vulkan
 
             VkSemaphore RenderSemaphore = Synchronization.QuerySemaphore();
 
+            //Signal fence waiting for rendering semaphore
             VkSubmitInfo SubmitInfo = new VkSubmitInfo()
             {
                 sType = VkStructureType.SubmitInfo,

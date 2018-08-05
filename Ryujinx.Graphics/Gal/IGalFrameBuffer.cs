@@ -20,7 +20,7 @@ namespace Ryujinx.Graphics.Gal
 
         void SetViewport(int X, int Y, int Width, int Height);
 
-        void Render();
+        void SwapBuffers();
 
         void Copy(
             long SrcKey,

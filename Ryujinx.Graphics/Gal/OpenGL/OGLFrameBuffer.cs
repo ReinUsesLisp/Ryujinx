@@ -207,7 +207,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                 Viewport.Height);
         }
 
-        public void Render()
+        public void SwapBuffers()
         {
             if (CurrReadFb != null)
             {
