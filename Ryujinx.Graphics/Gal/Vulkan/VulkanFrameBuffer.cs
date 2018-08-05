@@ -54,7 +54,7 @@ namespace Ryujinx.Graphics.Gal.Vulkan
 
         private VulkanSwapChain SwapChain;
 
-        private VkSemaphore PresentCompleteSemaphore;
+        private VkSemaphore PresentSemaphore;
         private uint ImageIndex;
 
         private Rect Window;
@@ -93,12 +93,12 @@ namespace Ryujinx.Graphics.Gal.Vulkan
 
             VkSemaphoreCreateInfo SemaphoreCI = VkSemaphoreCreateInfo.New();
 
-            Check(VK.CreateSemaphore(Device, ref SemaphoreCI, IntPtr.Zero, out PresentCompleteSemaphore));
+            Check(VK.CreateSemaphore(Device, ref SemaphoreCI, IntPtr.Zero, out PresentSemaphore));
         }
 
         public void Dispose()
         {
-            VK.DestroySemaphore(Device, PresentCompleteSemaphore, IntPtr.Zero);
+            VK.DestroySemaphore(Device, PresentSemaphore, IntPtr.Zero);
         }
 
         public void Bind(long Key)
@@ -265,15 +265,34 @@ namespace Ryujinx.Graphics.Gal.Vulkan
 
         public unsafe void SwapBuffers()
         {
-            /*VK.QueueWaitIdle(GraphicsQueue);
-            VK.QueueWaitIdle(PresentQueue);
-            VK.DeviceWaitIdle(Device);*/
+            ImageIndex = SwapChain.AcquireNextImage(PresentSemaphore);
 
-            ImageIndex = SwapChain.AcquireNextImage(PresentCompleteSemaphore);
+            Check(VK.WaitForFences(Device, 1, ref SwapChain.Fences[ImageIndex], true, ulong.MaxValue));
+
+            Check(VK.ResetFences(Device, 1, ref SwapChain.Fences[ImageIndex]));
 
             Render();
 
-            SwapChain.QueuePresent(PresentQueue, ImageIndex, PresentCompleteSemaphore, Synchronization.QuerySemaphore());
+            VkSemaphore RenderSemaphore = Synchronization.QuerySemaphore();
+
+            VkSubmitInfo SubmitInfo = new VkSubmitInfo()
+            {
+                sType = VkStructureType.SubmitInfo,
+                commandBufferCount = 0,
+            };
+
+            VkPipelineStageFlags StageMask = VkPipelineStageFlags.AllGraphics;
+
+            if (RenderSemaphore != VkSemaphore.Null)
+            {
+                SubmitInfo.waitSemaphoreCount = 1;
+                SubmitInfo.pWaitSemaphores = &RenderSemaphore;
+                SubmitInfo.pWaitDstStageMask = &StageMask;
+            }
+
+            Check(VK.QueueSubmit(GraphicsQueue, 1, ref SubmitInfo, SwapChain.Fences[ImageIndex]));
+
+            SwapChain.QueuePresent(PresentQueue, ImageIndex, PresentSemaphore, RenderSemaphore);
         }
 
         public void Set(long Key)

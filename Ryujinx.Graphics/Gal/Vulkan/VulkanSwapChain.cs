@@ -1,5 +1,6 @@
 ﻿using OpenTK.Graphics.Vulkan;
 using System;
+using System.Collections.Generic;
 
 namespace Ryujinx.Graphics.Gal.Vulkan
 {
@@ -18,6 +19,7 @@ namespace Ryujinx.Graphics.Gal.Vulkan
         public VulkanList<VkImage>       Images       { get; private set; }
         public VulkanList<VkImageView>   ImageViews   { get; private set; }
         public VulkanList<VkFramebuffer> Framebuffers { get; private set; }
+        public VkFence[]                 Fences       { get; private set; }
         public VkRenderPass              RenderPass   { get; private set; }
 
         private int CurrentWidth;
@@ -101,6 +103,7 @@ namespace Ryujinx.Graphics.Gal.Vulkan
 
             this.SwapChain = SwapChain;
 
+            //Destroy old data
             if (OldSwapChain != VkSwapchainKHR.Null)
             {
                 foreach (VkImageView ImageView in ImageViews)
@@ -111,6 +114,11 @@ namespace Ryujinx.Graphics.Gal.Vulkan
                 foreach (VkFramebuffer Framebuffer in Framebuffers)
                 {
                     VK.DestroyFramebuffer(Device, Framebuffer, IntPtr.Zero);
+                }
+
+                foreach (VkFence Fence in Fences)
+                {
+                    VK.DestroyFence(Device, Fence, IntPtr.Zero);
                 }
 
                 VK.DestroySwapchainKHR(Device, OldSwapChain, IntPtr.Zero);
@@ -229,6 +237,20 @@ namespace Ryujinx.Graphics.Gal.Vulkan
                 };
 
                 Check(VK.CreateFramebuffer(Device, ref FramebufferCI, IntPtr.Zero, out Framebuffers[i]));
+            }
+
+            //Create fences
+            Fences = new VkFence[ImageCount];
+
+            for (int i = 0; i < ImageCount; i++)
+            {
+                VkFenceCreateInfo FenceCI = new VkFenceCreateInfo()
+                {
+                    sType = VkStructureType.FenceCreateInfo,
+                    flags = VkFenceCreateFlags.Signaled
+                };
+
+                Check(VK.CreateFence(Device, ref FenceCI, IntPtr.Zero, out Fences[i]));
             }
         }
 
