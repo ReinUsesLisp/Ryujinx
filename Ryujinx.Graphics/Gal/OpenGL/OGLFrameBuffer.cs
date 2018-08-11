@@ -5,7 +5,7 @@ using System.Collections.Generic;
 
 namespace Ryujinx.Graphics.Gal.OpenGL
 {
-    public class OGLFrameBuffer : IGalFrameBuffer
+    class OGLFrameBuffer : IGalFrameBuffer
     {
         private struct Rect
         {
@@ -22,8 +22,6 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                 this.Height = Height;
             }
         }
-
-        
 
         private static readonly DrawBuffersEnum[] DrawBuffers = new DrawBuffersEnum[]
         {
@@ -42,8 +40,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
 
         private const GalImageFormat RawFormat = GalImageFormat.A8B8G8R8;
 
-        private Dictionary<long, TCE> ColorTextures;
-        private Dictionary<long, TCE> ZetaTextures;
+        private OGLTexture Texture;
 
         private TCE RawTex;
         private TCE ReadTex;
@@ -64,30 +61,14 @@ namespace Ryujinx.Graphics.Gal.OpenGL
         private int SrcFb;
         private int DstFb;
 
-        public OGLFrameBuffer()
+        public OGLFrameBuffer(OGLTexture Texture)
         {
-            ColorTextures = new Dictionary<long, TCE>();
-
-            ZetaTextures = new Dictionary<long, TCE>();
-        }
-
-        public void CreateColor(long Key, int Width, int Height, GalFrameBufferFormat Format)
-        {
-            if (!ColorTextures.TryGetValue(Key, out TCE Tex))
-            {
-                Tex = new TCE();
-
-                ColorTextures.Add(Key, Tex);
-            }
-
-            GalImageFormat ImageFormat = ImageFormatConverter.ConvertFrameBuffer(Format);
-
-            Tex.EnsureSetup(new GalImage(Width, Height, ImageFormat));
+            this.Texture = Texture;
         }
 
         public void BindColor(long Key, int Attachment)
         {
-            if (ColorTextures.TryGetValue(Key, out TCE Tex))
+            if (Texture.TryGetTCE(Key, out TCE Tex))
             {
                 EnsureFrameBuffer();
 
@@ -113,24 +94,10 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                 0,
                 0);
         }
-
-        public void CreateZeta(long Key, int Width, int Height, GalZetaFormat Format)
-        {
-            if (!ZetaTextures.TryGetValue(Key, out TCE Tex))
-            {
-                Tex = new TCE();
-
-                ZetaTextures.Add(Key, Tex);
-            }
-
-            GalImageFormat ImageFormat = ImageFormatConverter.ConvertZeta(Format);
-
-            Tex.EnsureSetup(new GalImage(Width, Height, ImageFormat));
-        }
-
+        
         public void BindZeta(long Key)
         {
-            if (ZetaTextures.TryGetValue(Key, out TCE Tex))
+            if (Texture.TryGetTCE(Key, out TCE Tex))
             {
                 EnsureFrameBuffer();
 
@@ -159,10 +126,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
 
         public void BindTexture(long Key, int Index)
         {
-            TCE Tex;
-
-            if (ColorTextures.TryGetValue(Key, out Tex) ||
-                 ZetaTextures.TryGetValue(Key, out Tex))
+            if (Texture.TryGetTCE(Key, out TCE Tex))
             {
                 GL.ActiveTexture(TextureUnit.Texture0 + Index);
 
@@ -172,7 +136,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
 
         public void Set(long Key)
         {
-            if (ColorTextures.TryGetValue(Key, out TCE Tex))
+            if (Texture.TryGetTCE(Key, out TCE Tex))
             {
                 ReadTex = Tex;
             }
@@ -307,50 +271,72 @@ namespace Ryujinx.Graphics.Gal.OpenGL
             int  DstX1,
             int  DstY1)
         {
-            bool Found = false;
-
-            if (ColorTextures.TryGetValue(SrcKey, out TCE SrcTex) &&
-                ColorTextures.TryGetValue(DstKey, out TCE DstTex))
+            if (Texture.TryGetTCE(SrcKey, out TCE SrcTex) &&
+                Texture.TryGetTCE(DstKey, out TCE DstTex))
             {
-                CopyTextures(
-                    SrcX0, SrcY0, SrcX1, SrcY1,
-                    DstX0, DstY0, DstX1, DstY1,
-                    SrcTex.Handle,
-                    DstTex.Handle,
-                    FramebufferAttachment.ColorAttachment0,
-                    ClearBufferMask.ColorBufferBit,
-                    true);
+                if (SrcTex.HasColor != DstTex.HasColor ||
+                    SrcTex.HasDepth != DstTex.HasDepth ||
+                    SrcTex.HasStencil != DstTex.HasStencil)
+                {
+                    throw new NotImplementedException();
+                }
 
-                Found = true;
-            }
+                if (SrcTex.HasColor)
+                {
+                    CopyTextures(
+                        SrcX0, SrcY0, SrcX1, SrcY1,
+                        DstX0, DstY0, DstX1, DstY1,
+                        SrcTex.Handle,
+                        DstTex.Handle,
+                        FramebufferAttachment.ColorAttachment0,
+                        ClearBufferMask.ColorBufferBit,
+                        true);
+                }
+                else if (SrcTex.HasDepth && SrcTex.HasStencil)
+                {
+                    CopyTextures(
+                        SrcX0, SrcY0, SrcX1, SrcY1,
+                        DstX0, DstY0, DstX1, DstY1,
+                        SrcTex.Handle,
+                        DstTex.Handle,
+                        FramebufferAttachment.DepthStencilAttachment,
+                        ClearBufferMask.DepthBufferBit | ClearBufferMask.StencilBufferBit,
+                        false);
+                }
+                else if (SrcTex.HasDepth)
+                {
+                    CopyTextures(
+                        SrcX0, SrcY0, SrcX1, SrcY1,
+                        DstX0, DstY0, DstX1, DstY1,
+                        SrcTex.Handle,
+                        DstTex.Handle,
+                        FramebufferAttachment.DepthAttachment,
+                        ClearBufferMask.DepthBufferBit,
+                        false);
+                }
+                else if (SrcTex.HasStencil)
+                {
+                    CopyTextures(
+                        SrcX0, SrcY0, SrcX1, SrcY1,
+                        DstX0, DstY0, DstX1, DstY1,
+                        SrcTex.Handle,
+                        DstTex.Handle,
+                        FramebufferAttachment.StencilAttachment,
+                        ClearBufferMask.StencilBufferBit,
+                        false);
+                }
+                else
+                {
+                    throw new InvalidOperationException();
+                }
 
-            if (ZetaTextures.TryGetValue(SrcKey, out TCE ZetaSrcTex) &&
-                ZetaTextures.TryGetValue(DstKey, out TCE ZetaDstTex))
-            {
-                CopyTextures(
-                    SrcX0, SrcY0, SrcX1, SrcY1,
-                    DstX0, DstY0, DstX1, DstY1,
-                    ZetaSrcTex.Handle,
-                    ZetaDstTex.Handle,
-                    FramebufferAttachment.DepthStencilAttachment,
-                    ClearBufferMask.DepthBufferBit | ClearBufferMask.StencilBufferBit,
-                    false);
-
-                Found = true;
-            }
-
-            if (Found)
-            {
                 EnsureFrameBuffer();
             }
         }
 
         public void GetBufferData(long Key, Action<byte[]> Callback)
         {
-            TCE Tex;
-
-            if (ColorTextures.TryGetValue(Key, out Tex) ||
-                 ZetaTextures.TryGetValue(Key, out Tex))
+            if (Texture.TryGetTCE(Key, out TCE Tex))
             {
                 byte[] Data = new byte[Tex.Width * Tex.Height * TCE.MaxBpp];
 
@@ -373,10 +359,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
             int              Height,
             byte[]           Buffer)
         {
-            TCE Tex;
-
-            if (ColorTextures.TryGetValue(Key, out Tex) ||
-                 ZetaTextures.TryGetValue(Key, out Tex))
+            if (Texture.TryGetTCE(Key, out TCE Tex))
             {
                 GL.BindTexture(TextureTarget.Texture2D, Tex.Handle);
 
