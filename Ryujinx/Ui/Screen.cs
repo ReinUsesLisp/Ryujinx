@@ -61,10 +61,6 @@ namespace Ryujinx
                 ResizeEvent = true;
                 Resized();
             };
-
-            Location = new Point(
-                (DisplayDevice.Default.Width  / 2) - (Width  / 2),
-                (DisplayDevice.Default.Height / 2) - (Height / 2));
         }
 
         private void RenderLoop()
