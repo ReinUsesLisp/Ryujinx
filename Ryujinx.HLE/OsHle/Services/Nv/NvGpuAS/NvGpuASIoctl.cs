@@ -63,7 +63,7 @@ namespace Ryujinx.HLE.OsHle.Services.Nv.NvGpuAS
             }
             else
             {
-                Args.Offset = Vmm.Reserve((long)Size, 1);
+                Args.Offset = Vmm.Reserve((long)Size, Args.Offset);
             }
 
             int Result = NvResult.Success;

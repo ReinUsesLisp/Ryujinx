@@ -73,7 +73,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                 EnsureFrameBuffer();
 
                 GL.FramebufferTexture(
-                    FramebufferTarget.Framebuffer,
+                    FramebufferTarget.DrawFramebuffer,
                     FramebufferAttachment.ColorAttachment0 + Attachment,
                     Tex.Handle,
                     0);
@@ -89,7 +89,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
             EnsureFrameBuffer();
 
             GL.FramebufferTexture(
-                FramebufferTarget.Framebuffer,
+                FramebufferTarget.DrawFramebuffer,
                 FramebufferAttachment.ColorAttachment0 + Attachment,
                 0,
                 0);
@@ -101,11 +101,46 @@ namespace Ryujinx.Graphics.Gal.OpenGL
             {
                 EnsureFrameBuffer();
 
-                GL.FramebufferTexture(
-                    FramebufferTarget.Framebuffer,
-                    FramebufferAttachment.DepthStencilAttachment,
-                    Tex.Handle,
-                    0);
+                if (Tex.HasDepth && Tex.HasStencil)
+                {
+                    GL.FramebufferTexture(
+                        FramebufferTarget.DrawFramebuffer,
+                        FramebufferAttachment.DepthStencilAttachment,
+                        Tex.Handle,
+                        0);
+                }
+                else if (Tex.HasDepth)
+                {
+                    GL.FramebufferTexture(
+                        FramebufferTarget.DrawFramebuffer,
+                        FramebufferAttachment.DepthAttachment,
+                        Tex.Handle,
+                        0);
+
+                    GL.FramebufferTexture(
+                        FramebufferTarget.DrawFramebuffer,
+                        FramebufferAttachment.StencilAttachment,
+                        0,
+                        0);
+                }
+                else if (Tex.HasStencil)
+                {
+                    GL.FramebufferTexture(
+                        FramebufferTarget.DrawFramebuffer,
+                        FramebufferAttachment.DepthAttachment,
+                        Tex.Handle,
+                        0);
+
+                    GL.FramebufferTexture(
+                        FramebufferTarget.DrawFramebuffer,
+                        FramebufferAttachment.StencilAttachment,
+                        0,
+                        0);
+                }
+                else
+                {
+                    throw new InvalidOperationException();
+                }
             }
             else
             {
@@ -118,7 +153,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
             EnsureFrameBuffer();
 
             GL.FramebufferTexture(
-                FramebufferTarget.Framebuffer,
+                FramebufferTarget.DrawFramebuffer,
                 FramebufferAttachment.DepthStencilAttachment,
                 0,
                 0);
@@ -386,7 +421,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                 DummyFrameBuffer = GL.GenFramebuffer();
             }
 
-            GL.BindFramebuffer(FramebufferTarget.Framebuffer, DummyFrameBuffer);
+            GL.BindFramebuffer(FramebufferTarget.DrawFramebuffer, DummyFrameBuffer);
 
             GL.DrawBuffers(8, DrawBuffers);
         }

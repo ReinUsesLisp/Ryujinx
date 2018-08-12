@@ -104,8 +104,6 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                 {
                     GL.BindBuffer(BufferTarget.PixelPackBuffer, 0);
                     GL.BindBuffer(BufferTarget.PixelUnpackBuffer, 0);
-
-                    GL.DeleteBuffer(CopyBuffer);
                 }
 
                 this.Image = Image;
