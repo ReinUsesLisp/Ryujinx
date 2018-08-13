@@ -99,7 +99,7 @@ namespace Ryujinx.Graphics.Gal.Shader
             {
                 for (int Index = 0; Index < MaxFrameBufferAttachments; Index++)
                 {
-                    m_Gprs.Add(Index * 4, new ShaderDeclInfo(FragmentOutputName + Index, Index * 4, 0, 4));
+                    m_Gprs.Add(Index * 4, new ShaderDeclInfo(FragmentOutputName + Index, Index * 4, false, 0, 4));
                 }
             }
 
