@@ -23,7 +23,7 @@ namespace Ryujinx.HLE.Gpu.Engines
 
         private ConstBuffer[][] ConstBuffers;
 
-        private HashSet<long> FrameBuffers;
+        private HashSet<long> RenderTargets;
 
         private List<long>[] UploadedKeys;
 
@@ -58,7 +58,7 @@ namespace Ryujinx.HLE.Gpu.Engines
                 ConstBuffers[Index] = new ConstBuffer[18];
             }
 
-            FrameBuffers = new HashSet<long>();
+            RenderTargets = new HashSet<long>();
 
             UploadedKeys = new List<long>[(int)NvGpuBufferType.Count];
 
@@ -174,14 +174,14 @@ namespace Ryujinx.HLE.Gpu.Engines
 
             if (VA == 0 || Format == 0)
             {
-                Gpu.Renderer.FrameBuffer.UnbindColor(FbIndex);
+                Gpu.Renderer.RenderTarget.UnbindColor(FbIndex);
 
                 return;
             }
 
             long Key = Vmm.GetPhysicalAddress(VA);
 
-            FrameBuffers.Add(Key);
+            RenderTargets.Add(Key);
 
             int Width  = ReadRegister(NvGpuEngine3dReg.FrameBufferNWidth  + FbIndex * 0x10);
             int Height = ReadRegister(NvGpuEngine3dReg.FrameBufferNHeight + FbIndex * 0x10);
@@ -205,28 +205,30 @@ namespace Ryujinx.HLE.Gpu.Engines
             long Size = TextureHelper.GetTextureSize(Image);
 
             Gpu.Renderer.Texture.CreateFb(Key, Size, Image);
-            Gpu.Renderer.FrameBuffer.BindColor(Key, FbIndex);
+            Gpu.Renderer.RenderTarget.BindColor(Key, FbIndex);
 
-            Gpu.Renderer.FrameBuffer.SetViewport(VpX, VpY, VpW, VpH);
+            Gpu.Renderer.RenderTarget.SetViewport(VpX, VpY, VpW, VpH);
         }
 
         private void SetZeta(NvGpuVmm Vmm)
         {
-            long ZA = MakeInt64From2xInt32(NvGpuEngine3dReg.ZetaAddress);
+            long VA = MakeInt64From2xInt32(NvGpuEngine3dReg.ZetaAddress);
 
             int Format = ReadRegister(NvGpuEngine3dReg.ZetaFormat);
 
             bool ZetaEnable = (ReadRegister(NvGpuEngine3dReg.ZetaEnable) & 1) != 0;
 
-            if (ZA == 0 || Format == 0 || !ZetaEnable)
+            if (VA == 0 || Format == 0 || !ZetaEnable)
             {
-                Gpu.Renderer.FrameBuffer.UnbindZeta();
+                Gpu.Renderer.RenderTarget.UnbindZeta();
 
                 return;
             }
 
-            long Key = Vmm.GetPhysicalAddress(ZA);
-            
+            long Key = Vmm.GetPhysicalAddress(VA);
+
+            RenderTargets.Add(Key);
+
             int Width  = ReadRegister(NvGpuEngine3dReg.ZetaHoriz);
             int Height = ReadRegister(NvGpuEngine3dReg.ZetaVert);
 
@@ -237,7 +239,7 @@ namespace Ryujinx.HLE.Gpu.Engines
             long Size = TextureHelper.GetTextureSize(Image);
 
             Gpu.Renderer.Texture.CreateFb(Key, Size, Image);
-            Gpu.Renderer.FrameBuffer.BindZeta(Key);
+            Gpu.Renderer.RenderTarget.BindZeta(Key);
         }
 
         private long[] UploadShaders(NvGpuVmm Vmm)
@@ -439,11 +441,11 @@ namespace Ryujinx.HLE.Gpu.Engines
                     Map[i] = (int)((Control >> Shift) & 7);
                 }
 
-                Gpu.Renderer.FrameBuffer.SetMap(Map);
+                Gpu.Renderer.RenderTarget.SetMap(Map);
             }
             else
             {
-                Gpu.Renderer.FrameBuffer.SetMap(null);
+                Gpu.Renderer.RenderTarget.SetMap(null);
             }
         }
 
@@ -517,7 +519,7 @@ namespace Ryujinx.HLE.Gpu.Engines
                 //we shouldn't read anything from memory and bind
                 //the frame buffer texture instead, since we're not
                 //really writing anything to memory.
-                Gpu.Renderer.FrameBuffer.BindTexture(Key, TexIndex);
+                Gpu.Renderer.RenderTarget.BindTexture(Key, TexIndex);
             }
             else
             {
@@ -816,7 +818,7 @@ namespace Ryujinx.HLE.Gpu.Engines
 
         public bool IsFrameBufferPosition(long Position)
         {
-            return FrameBuffers.Contains(Position);
+            return RenderTargets.Contains(Position);
         }
 
         private bool QueryKeyUpload(NvGpuVmm Vmm, long Key, long Size, NvGpuBufferType Type)
