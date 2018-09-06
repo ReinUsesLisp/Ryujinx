@@ -38,7 +38,7 @@ namespace Ryujinx
             : base(1280, 720,
             new GraphicsMode(), "Ryujinx", 0,
             DisplayDevice.Default, 3, 3,
-            GraphicsContextFlags.ForwardCompatible)
+            GraphicsContextFlags.Default)
         {
             this.Device   = Device;
             this.Renderer = Renderer;

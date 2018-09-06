@@ -14,9 +14,9 @@ namespace Ryujinx.Graphics.Gal
 
         void BindTexture(long Key, int Index);
 
-        void Set(long Key);
+        void Present(long Key);
 
-        void Set(byte[] Data, int Width, int Height);
+        void Present(byte[] Data, int Width, int Height);
 
         void SetMap(int[] Map);
 

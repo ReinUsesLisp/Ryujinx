@@ -10,13 +10,13 @@ namespace Ryujinx.Graphics.Gal.OpenGL
         private const int MaxTimeDelta      = 5 * 60000;
         private const int MaxRemovalsPerRun = 10;
 
-        private struct CacheBucket
+        private class CacheBucket
         {
             public T Value { get; private set; }
 
             public LinkedListNode<long> Node { get; private set; }
 
-            public long DataSize { get; private set; }
+            public long DataSize { get; set; }
 
             public int Timestamp { get; private set; }
 
@@ -73,11 +73,26 @@ namespace Ryujinx.Graphics.Gal.OpenGL
             ClearCacheIfNeeded();
         }
 
+        public void Resize(long Key, long Size)
+        {
+            if (!Cache.TryGetValue(Key, out CacheBucket Bucket))
+            {
+                throw new InvalidOperationException();
+            }
+
+            Bucket.DataSize = Size;
+        }
+
         public void AddOrUpdate(long Key, T Value, long Size)
         {
             if (!Locked)
             {
                 ClearCacheIfNeeded();
+            }
+
+            if (Key == 0x29F7E0000)
+            {
+                Console.WriteLine($"0x{Size:X}");
             }
 
             LinkedListNode<long> Node = SortedCache.AddLast(Key);

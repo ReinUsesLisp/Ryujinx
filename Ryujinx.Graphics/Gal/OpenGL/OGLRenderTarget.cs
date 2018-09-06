@@ -48,6 +48,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
         private int DummyFrameBuffer;
 
         //These framebuffers are used to blit images
+        private int BlitFb;
         private int SrcFb;
         private int DstFb;
 
@@ -66,7 +67,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
 
         public void BindColor(long Key, int Attachment)
         {
-            if (Texture.TryGetImage(Key, out ImageHandler Tex))
+            if (Texture.TryGetHandler(Key, out ImageHandler Tex))
             {
                 EnsureFrameBuffer();
 
@@ -87,7 +88,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
         
         public void BindZeta(long Key)
         {
-            if (Texture.TryGetImage(Key, out ImageHandler Tex))
+            if (Texture.TryGetHandler(Key, out ImageHandler Tex))
             {
                 EnsureFrameBuffer();
 
@@ -151,7 +152,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
 
         public void BindTexture(long Key, int Index)
         {
-            if (Texture.TryGetImage(Key, out ImageHandler Tex))
+            if (Texture.TryGetHandler(Key, out ImageHandler Tex))
             {
                 GL.ActiveTexture(TextureUnit.Texture0 + Index);
 
@@ -159,22 +160,22 @@ namespace Ryujinx.Graphics.Gal.OpenGL
             }
         }
 
-        public void Set(long Key)
+        public void Present(long Key)
         {
-            if (Texture.TryGetImage(Key, out ImageHandler Tex))
+            if (Texture.TryGetHandler(Key, out ImageHandler Handler))
             {
-                ReadTex = Tex;
+                ReadTex = Handler;
             }
         }
 
-        public void Set(byte[] Data, int Width, int Height)
+        public void Present(byte[] Data, int Width, int Height)
         {
             if (RawTex == null)
             {
                 RawTex = new ImageHandler();
-            }
 
-            RawTex.EnsureSetup(new GalImage(Width, Height, RawFormat));
+                RawTex.CreateRT(new GalImage(Width, Height, RawFormat));
+            }
 
             GL.BindTexture(TextureTarget.Texture2D, RawTex.Handle);
 
@@ -280,13 +281,13 @@ namespace Ryujinx.Graphics.Gal.OpenGL
             int DstY0 = FlipY ? DstPaddingY : Window.Height - DstPaddingY;
             int DstY1 = FlipY ? Window.Height - DstPaddingY : DstPaddingY;
 
-            if (SrcFb == 0) SrcFb = GL.GenFramebuffer();
+            if (BlitFb == 0) BlitFb = GL.GenFramebuffer();
 
             GL.BindFramebuffer(FramebufferTarget.DrawFramebuffer, 0);
 
             GL.Viewport(0, 0, Window.Width, Window.Height);
 
-            GL.BindFramebuffer(FramebufferTarget.ReadFramebuffer, SrcFb);
+            GL.BindFramebuffer(FramebufferTarget.ReadFramebuffer, BlitFb);
 
             GL.FramebufferTexture(FramebufferTarget.ReadFramebuffer, FramebufferAttachment.ColorAttachment0, ReadTex.Handle, 0);
 
@@ -315,8 +316,8 @@ namespace Ryujinx.Graphics.Gal.OpenGL
             int  DstX1,
             int  DstY1)
         {
-            if (Texture.TryGetImage(SrcKey, out ImageHandler SrcTex) &&
-                Texture.TryGetImage(DstKey, out ImageHandler DstTex))
+            if (Texture.TryGetHandler(SrcKey, out ImageHandler SrcTex) &&
+                Texture.TryGetHandler(DstKey, out ImageHandler DstTex))
             {
                 if (SrcTex.HasColor != DstTex.HasColor ||
                     SrcTex.HasDepth != DstTex.HasDepth ||
@@ -378,7 +379,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
 
         public void GetBufferData(long Key, Action<byte[]> Callback)
         {
-            if (Texture.TryGetImage(Key, out ImageHandler Tex))
+            if (Texture.TryGetHandler(Key, out ImageHandler Tex))
             {
                 byte[] Data = new byte[ImageUtils.GetSize(Tex.Image)];
 
@@ -401,7 +402,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
             int              Height,
             byte[]           Buffer)
         {
-            if (Texture.TryGetImage(Key, out ImageHandler Tex))
+            if (Texture.TryGetHandler(Key, out ImageHandler Tex))
             {
                 GL.BindTexture(TextureTarget.Texture2D, Tex.Handle);
 
@@ -482,8 +483,6 @@ namespace Ryujinx.Graphics.Gal.OpenGL
             {
                 GL.DrawBuffer(DrawBufferMode.ColorAttachment0);
             }
-
-            GL.Clear(Mask);
 
             GL.BlitFramebuffer(
                 SrcX0, SrcY0, SrcX1, SrcY1,
