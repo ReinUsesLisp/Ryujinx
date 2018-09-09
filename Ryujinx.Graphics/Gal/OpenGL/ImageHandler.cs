@@ -9,7 +9,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
         private static int CopyBuffer = 0;
         private static int CopyBufferSize = 0;
 
-        public GalImage Image { get; private set; }
+        public GalImage Image;
 
         public int Width  => Image.Width;
         public int Height => Image.Height;
@@ -143,7 +143,9 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                 GL.BindBuffer(BufferTarget.PixelUnpackBuffer, 0);
             }
 
-            Image = NewImage;
+            Image.Width  = NewImage.Width;
+            Image.Height = NewImage.Height;
+            Image.Format = NewImage.Format;
 
             this.InternalFormat = InternalFmt;
             this.PixelFormat = PixelFormat;
