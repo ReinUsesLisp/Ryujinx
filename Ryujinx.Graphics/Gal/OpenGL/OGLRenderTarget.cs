@@ -174,7 +174,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                 RawTex = new ImageHandler();
             }
 
-            RawTex.EnsureSetup(new GalImage(Width, Height, RawFormat));
+            RawTex.EnsureRT(new GalImage(Width, Height, RawFormat));
 
             GL.BindTexture(TextureTarget.Texture2D, RawTex.Handle);
 

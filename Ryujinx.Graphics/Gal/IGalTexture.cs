@@ -13,8 +13,6 @@ namespace Ryujinx.Graphics.Gal
 
         bool IsCached(long Key);
 
-        void Bind(long Key, int Index);
-
-        void SetSampler(GalTextureSampler Sampler);
+        void Bind(long Key, int Index, GalTextureSampler Sampler, GalImage Swizzle);
     }
 }

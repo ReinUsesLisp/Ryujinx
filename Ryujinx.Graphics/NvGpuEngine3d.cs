@@ -515,8 +515,6 @@ namespace Ryujinx.Graphics
             {
                 if (NewImage.Equals(Image) && !QueryKeyUpload(Vmm, Key, Size, NvGpuBufferType.Texture))
                 {
-                    Gpu.Renderer.Texture.Bind(Key, TexIndex);
-
                     HasCachedTexture = true;
                 }
             }
@@ -528,9 +526,7 @@ namespace Ryujinx.Graphics
                 Gpu.Renderer.Texture.Create(Key, Data, NewImage);
             }
 
-            Gpu.Renderer.Texture.Bind(Key, TexIndex);
-
-            Gpu.Renderer.Texture.SetSampler(Sampler);
+            Gpu.Renderer.Texture.Bind(Key, TexIndex, Sampler, NewImage);
         }
 
         private void UploadConstBuffers(NvGpuVmm Vmm, GalPipelineState State, long[] Keys)
