@@ -107,11 +107,16 @@ namespace Ryujinx.Graphics.Gal.OpenGL
 
         public void EnsureRT(GalImage NewImage)
         {
-            if (NewImage.Width  != Image.Width  ||
-                NewImage.Height != Image.Height ||
-                NewImage.Format != Image.Format)
+            if (Handle == 0)
             {
                 Create(null, NewImage);
+            }
+            else
+            {
+                if (Image.CacheEquals(NewImage))
+                {
+                    Reinterpret(NewImage);
+                }
             }
         }
 
