@@ -113,7 +113,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
             }
             else
             {
-                if (Image.CacheEquals(NewImage))
+                if (!Image.CacheEquals(NewImage))
                 {
                     Reinterpret(NewImage);
                 }
