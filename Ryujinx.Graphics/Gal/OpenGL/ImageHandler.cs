@@ -177,12 +177,6 @@ namespace Ryujinx.Graphics.Gal.OpenGL
 
             GL.BindTexture(TextureTarget.Texture2D, Handle);*/
 
-            Console.WriteLine("Start");
-
-            Console.WriteLine($"New: {ImageUtils.GetSize(NewImage)}");
-
-            Console.WriteLine($"Old: {ImageUtils.GetSize(Image)}");
-
             GL.PixelStore(PixelStoreParameter.UnpackRowLength, Image.Width);
 
             const int Level = 0;

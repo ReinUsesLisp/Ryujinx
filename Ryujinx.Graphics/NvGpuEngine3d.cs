@@ -112,7 +112,7 @@ namespace Ryujinx.Graphics
             UploadConstBuffers(Vmm, State, Keys);
             UploadVertexArrays(Vmm, State);
 
-            OpenTK.Graphics.OpenGL.GL.DepthMask((ReadRegister((NvGpuEngine3dReg)0x4BA) & 1) != 0);
+            OpenTK.Graphics.OpenGL.GL.DepthMask((ReadRegister((NvGpuEngine3dReg)0x4ba) & 1) != 0);
 
             DispatchRender(Vmm, State);
 
