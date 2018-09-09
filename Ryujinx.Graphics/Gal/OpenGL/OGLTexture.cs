@@ -32,18 +32,18 @@ namespace Ryujinx.Graphics.Gal.OpenGL
         {
             ImageHandler Handler = new ImageHandler();
 
-            TextureCache.AddOrUpdate(Key, Handler, (uint)Data.Length);
+            TextureCache.AddOrUpdate(Key, Handler, ImageUtils.GetSize(Image, true));
 
             Handler.CreateTexture(Data, Image);
         }
 
-        public void EnsureRT(long Key, long Size, GalImage Image)
+        public void EnsureRT(long Key, GalImage Image)
         {
             if (!TryGetImage(Key, out ImageHandler CachedImage))
             {
                 CachedImage = new ImageHandler();
 
-                TextureCache.AddOrUpdate(Key, CachedImage, Size);
+                TextureCache.AddOrUpdate(Key, CachedImage, ImageUtils.GetSize(Image, true));
             }
 
             CachedImage.EnsureRT(Image);
@@ -71,11 +71,12 @@ namespace Ryujinx.Graphics.Gal.OpenGL
             return false;
         }
 
-        public bool TryGetCachedTexture(long Key, long DataSize, out GalImage Image)
+        public bool TryGetCachedTexture(long Key, out GalImage Image)
         {
-            if (TextureCache.TryGetSize(Key, out long Size) && Size == DataSize)
+            if (TextureCache.TryGetSize(Key, out long Size) &&
+                TextureCache.TryGetValue(Key, out ImageHandler CachedImage))
             {
-                if (TextureCache.TryGetValue(Key, out ImageHandler CachedImage))
+                if (Size == ImageUtils.GetSize(CachedImage.Image, true))
                 {
                     Image = CachedImage.Image;
 

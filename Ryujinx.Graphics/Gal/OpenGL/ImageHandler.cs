@@ -34,6 +34,8 @@ namespace Ryujinx.Graphics.Gal.OpenGL
 
             GL.BindTexture(TextureTarget.Texture2D, Handle);
 
+            GL.PixelStore(PixelStoreParameter.UnpackRowLength, Image.Width);
+
             const int Level  = 0; //TODO: Support mipmap textures.
             const int Border = 0;
 
@@ -98,6 +100,8 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                     Type,
                     Data);
             }
+
+            GL.PixelStore(PixelStoreParameter.UnpackRowLength, 0);
         }
 
         public void CreateTexture(byte[] Data, GalImage Image)
@@ -173,6 +177,14 @@ namespace Ryujinx.Graphics.Gal.OpenGL
 
             GL.BindTexture(TextureTarget.Texture2D, Handle);*/
 
+            Console.WriteLine("Start");
+
+            Console.WriteLine($"New: {ImageUtils.GetSize(NewImage)}");
+
+            Console.WriteLine($"Old: {ImageUtils.GetSize(Image)}");
+
+            GL.PixelStore(PixelStoreParameter.UnpackRowLength, Image.Width);
+
             const int Level = 0;
             const int Border = 0;
 
@@ -201,6 +213,8 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                     PixelType,
                     IntPtr.Zero);
             }
+
+            GL.PixelStore(PixelStoreParameter.UnpackRowLength, 0);
 
             GL.BindBuffer(BufferTarget.PixelPackBuffer,   0);
             GL.BindBuffer(BufferTarget.PixelUnpackBuffer, 0);

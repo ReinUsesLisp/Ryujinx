@@ -32,8 +32,8 @@ namespace Ryujinx.Graphics.Gal
 
         public bool CacheEquals(GalImage Other)
         {
-            return AlignUp(Other.Width,  16) == AlignUp(Width,  16) &&
-                   AlignUp(Other.Height, 16) == AlignUp(Height, 16) &&
+            return AlignUp(Other.Width,  1) == AlignUp(Width,  1) &&
+                   AlignUp(Other.Height, 1) == AlignUp(Height, 1) &&
                    Other.Format == Format;
         }
 

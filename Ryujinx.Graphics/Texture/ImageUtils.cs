@@ -210,17 +210,26 @@ namespace Ryujinx.Graphics.Texture
             return GetImageDescriptor(Format).Reader;
         }
 
-        public static int GetSize(GalImage Image)
+        public static int GetSize(GalImage Image, bool Cache = false)
         {
+            int Width  = Image.Width;
+            int Height = Image.Height;
+
+            if (Cache)
+            {
+                Width  = (Width  + 15) / 16;
+                Height = (Height + 15) / 16;
+            }
+
             switch (Image.Format & GalImageFormat.FormatMask)
             {
                 case GalImageFormat.R32G32B32A32:
-                    return Image.Width * Image.Height * 16;
+                    return Width * Height * 16;
 
                 case GalImageFormat.R16G16B16A16:
                 case GalImageFormat.D32_S8:
                 case GalImageFormat.R32G32:
-                    return Image.Width * Image.Height * 8;
+                    return Width * Height * 8;
 
                 case GalImageFormat.A8B8G8R8:
                 case GalImageFormat.A8B8G8R8_SRGB:
@@ -230,7 +239,7 @@ namespace Ryujinx.Graphics.Texture
                 case GalImageFormat.D32:
                 case GalImageFormat.B10G11R11:
                 case GalImageFormat.D24_S8:
-                    return Image.Width * Image.Height * 4;
+                    return Width * Height * 4;
 
                 case GalImageFormat.B4G4R4A4:
                 case GalImageFormat.A1R5G5B5:
@@ -238,15 +247,15 @@ namespace Ryujinx.Graphics.Texture
                 case GalImageFormat.R8G8:
                 case GalImageFormat.R16:
                 case GalImageFormat.D16:
-                    return Image.Width * Image.Height * 2;
+                    return Width * Height * 2;
 
                 case GalImageFormat.R8:
-                    return Image.Width * Image.Height;
+                    return Width * Height;
 
                 case GalImageFormat.BC1_RGBA:
                 case GalImageFormat.BC4:
                 {
-                    return CompressedTextureSize(Image.Width, Image.Height, 4, 4, 8);
+                    return CompressedTextureSize(Width, Height, 4, 4, 8);
                 }
 
                 case GalImageFormat.BC6H_SF16:
@@ -256,46 +265,46 @@ namespace Ryujinx.Graphics.Texture
                 case GalImageFormat.BC3:
                 case GalImageFormat.BC5:
                 case GalImageFormat.ASTC_4x4:
-                    return CompressedTextureSize(Image.Width, Image.Height, 4, 4, 16);
+                    return CompressedTextureSize(Width, Height, 4, 4, 16);
 
                 case GalImageFormat.ASTC_5x5:
-                    return CompressedTextureSize(Image.Width, Image.Height, 5, 5, 16);
+                    return CompressedTextureSize(Width, Height, 5, 5, 16);
 
                 case GalImageFormat.ASTC_6x6:
-                    return CompressedTextureSize(Image.Width, Image.Height, 6, 6, 16);
+                    return CompressedTextureSize(Width, Height, 6, 6, 16);
 
                 case GalImageFormat.ASTC_8x8:
-                    return CompressedTextureSize(Image.Width, Image.Height, 8, 8, 16);
+                    return CompressedTextureSize(Width, Height, 8, 8, 16);
 
                 case GalImageFormat.ASTC_10x10:
-                    return CompressedTextureSize(Image.Width, Image.Height, 10, 10, 16);
+                    return CompressedTextureSize(Width, Height, 10, 10, 16);
 
                 case GalImageFormat.ASTC_12x12:
-                    return CompressedTextureSize(Image.Width, Image.Height, 12, 12, 16);
+                    return CompressedTextureSize(Width, Height, 12, 12, 16);
 
                 case GalImageFormat.ASTC_5x4:
-                    return CompressedTextureSize(Image.Width, Image.Height, 5, 4, 16);
+                    return CompressedTextureSize(Width, Height, 5, 4, 16);
 
                 case GalImageFormat.ASTC_6x5:
-                    return CompressedTextureSize(Image.Width, Image.Height, 6, 5, 16);
+                    return CompressedTextureSize(Width, Height, 6, 5, 16);
 
                 case GalImageFormat.ASTC_8x6:
-                    return CompressedTextureSize(Image.Width, Image.Height, 8, 6, 16);
+                    return CompressedTextureSize(Width, Height, 8, 6, 16);
 
                 case GalImageFormat.ASTC_10x8:
-                    return CompressedTextureSize(Image.Width, Image.Height, 10, 8, 16);
+                    return CompressedTextureSize(Width, Height, 10, 8, 16);
 
                 case GalImageFormat.ASTC_12x10:
-                    return CompressedTextureSize(Image.Width, Image.Height, 12, 10, 16);
+                    return CompressedTextureSize(Width, Height, 12, 10, 16);
 
                 case GalImageFormat.ASTC_8x5:
-                    return CompressedTextureSize(Image.Width, Image.Height, 8, 5, 16);
+                    return CompressedTextureSize(Width, Height, 8, 5, 16);
 
                 case GalImageFormat.ASTC_10x5:
-                    return CompressedTextureSize(Image.Width, Image.Height, 10, 5, 16);
+                    return CompressedTextureSize(Width, Height, 10, 5, 16);
 
                 case GalImageFormat.ASTC_10x6:
-                    return CompressedTextureSize(Image.Width, Image.Height, 10, 6, 16);
+                    return CompressedTextureSize(Width, Height, 10, 6, 16);
             }
 
             throw new NotImplementedException((Image.Format & GalImageFormat.FormatMask).ToString());

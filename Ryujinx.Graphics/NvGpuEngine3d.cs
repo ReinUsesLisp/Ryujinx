@@ -100,6 +100,10 @@ namespace Ryujinx.Graphics
             SetAlphaBlending(State);
             SetPrimitiveRestart(State);
 
+            SetFrameBuffer(Vmm, 0);
+            SetZeta(Vmm);
+            SetRenderTargets();
+
             long[] Keys = UploadShaders(Vmm);
 
             Gpu.Renderer.Shader.BindProgram();
@@ -109,10 +113,6 @@ namespace Ryujinx.Graphics
             UploadVertexArrays(Vmm, State);
 
             OpenTK.Graphics.OpenGL.GL.DepthMask((ReadRegister((NvGpuEngine3dReg)0x4BA) & 1) != 0);
-
-            SetFrameBuffer(Vmm, 0);
-            SetZeta(Vmm);
-            SetRenderTargets();
 
             DispatchRender(Vmm, State);
 
@@ -196,9 +196,7 @@ namespace Ryujinx.Graphics
 
             GalImage Image = new GalImage(Width, Height, ImageFormat);
 
-            long Size = ImageUtils.GetSize(Image);
-
-            Gpu.Renderer.Texture.EnsureRT(Key, Size, Image);
+            Gpu.Renderer.Texture.EnsureRT(Key, Image);
 
             Gpu.Renderer.RenderTarget.BindColor(Key, FbIndex);
 
@@ -229,9 +227,7 @@ namespace Ryujinx.Graphics
 
             GalImage Image = new GalImage(Width, Height, ImageFormat);
 
-            long Size = ImageUtils.GetSize(Image);
-
-            Gpu.Renderer.Texture.EnsureRT(Key, Size, Image);
+            Gpu.Renderer.Texture.EnsureRT(Key, Image);
 
             Gpu.Renderer.RenderTarget.BindZeta(Key);
         }
@@ -509,12 +505,12 @@ namespace Ryujinx.Graphics
 
             GalImage NewImage = TextureFactory.MakeTexture(Vmm, TicPosition);
 
-            long Size = (uint)ImageUtils.GetSize(NewImage);
-
             bool HasCachedTexture = false;
 
-            if (Gpu.Renderer.Texture.TryGetCachedTexture(Key, Size, out GalImage Image))
+            if (Gpu.Renderer.Texture.TryGetCachedTexture(Key, out GalImage Image))
             {
+                long Size = (uint)ImageUtils.GetSize(NewImage, true);
+
                 if (!QueryKeyUpload(Vmm, Key, Size, NvGpuBufferType.Texture))
                 {
                     HasCachedTexture = true;
