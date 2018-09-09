@@ -307,7 +307,7 @@ namespace Ryujinx.HLE.HOS.Services.Android
 
             //TODO: Support double buffering here aswell, it is broken for GPU
             //frame buffers because it seems to be completely out of sync.
-            if (Context.Device.Gpu.Engine3d.IsFrameBufferPosition(FbAddr))
+            if (Context.Device.Gpu.Renderer.Texture.IsCached(FbAddr))
             {
                 //Frame buffer is rendered to by the GPU, we can just
                 //bind the frame buffer texture, it's not necessary to read anything.

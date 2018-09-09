@@ -110,7 +110,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureSwizzleA, SwizzleA);
         }
 
-        public void CreateFb(long Key, long Size, GalImage Image)
+        public void EnsureRT(long Key, long Size, GalImage Image)
         {
             if (!TryGetImage(Key, out ImageHandler CachedImage))
             {
@@ -195,6 +195,11 @@ namespace Ryujinx.Graphics.Gal.OpenGL
             Image = default(GalImage);
 
             return false;
+        }
+
+        public bool IsCached(long Key)
+        {
+            return TextureCache.Contains(Key);
         }
 
         public void Bind(long Key, int Index)

@@ -23,8 +23,6 @@ namespace Ryujinx.Graphics
 
         private ConstBuffer[][] ConstBuffers;
 
-        private HashSet<long> FrameBuffers;
-
         private List<long>[] UploadedKeys;
 
         private int CurrentInstance = 0;
@@ -59,8 +57,6 @@ namespace Ryujinx.Graphics
             {
                 ConstBuffers[Index] = new ConstBuffer[18];
             }
-
-            FrameBuffers = new HashSet<long>();
 
             UploadedKeys = new List<long>[(int)NvGpuBufferType.Count];
 
@@ -104,15 +100,6 @@ namespace Ryujinx.Graphics
             SetAlphaBlending(State);
             SetPrimitiveRestart(State);
 
-            for (int FbIndex = 0; FbIndex < 8; FbIndex++)
-            {
-                SetFrameBuffer(Vmm, 0);
-            }
-
-            SetZeta(Vmm);
-
-            SetRenderTargets();
-
             long[] Keys = UploadShaders(Vmm);
 
             Gpu.Renderer.Shader.BindProgram();
@@ -120,6 +107,10 @@ namespace Ryujinx.Graphics
             UploadTextures(Vmm, State, Keys);
             UploadConstBuffers(Vmm, State, Keys);
             UploadVertexArrays(Vmm, State);
+
+            SetFrameBuffer(Vmm, 0);
+            SetZeta(Vmm);
+            SetRenderTargets();
 
             DispatchRender(Vmm, State);
 
@@ -184,8 +175,6 @@ namespace Ryujinx.Graphics
 
             long Key = Vmm.GetPhysicalAddress(VA);
 
-            FrameBuffers.Add(Key);
-
             int Width  = ReadRegister(NvGpuEngine3dReg.FrameBufferNWidth  + FbIndex * 0x10);
             int Height = ReadRegister(NvGpuEngine3dReg.FrameBufferNHeight + FbIndex * 0x10);
 
@@ -207,7 +196,7 @@ namespace Ryujinx.Graphics
 
             long Size = ImageUtils.GetSize(Image);
 
-            Gpu.Renderer.Texture.CreateFb(Key, Size, Image);
+            Gpu.Renderer.Texture.EnsureRT(Key, Size, Image);
 
             Gpu.Renderer.RenderTarget.BindColor(Key, FbIndex);
 
@@ -240,7 +229,7 @@ namespace Ryujinx.Graphics
 
             long Size = ImageUtils.GetSize(Image);
 
-            Gpu.Renderer.Texture.CreateFb(Key, Size, Image);
+            Gpu.Renderer.Texture.EnsureRT(Key, Size, Image);
 
             Gpu.Renderer.RenderTarget.BindZeta(Key);
         }
@@ -516,41 +505,30 @@ namespace Ryujinx.Graphics
                 return;
             }
 
-            if (IsFrameBufferPosition(Key))
+            GalImage NewImage = TextureFactory.MakeTexture(Vmm, TicPosition);
+
+            long Size = (uint)ImageUtils.GetSize(NewImage);
+
+            bool HasCachedTexture = false;
+
+            if (Gpu.Renderer.Texture.TryGetCachedTexture(Key, Size, out GalImage Image))
             {
-                //This texture is a frame buffer texture,
-                //we shouldn't read anything from memory and bind
-                //the frame buffer texture instead, since we're not
-                //really writing anything to memory.
-                Gpu.Renderer.RenderTarget.BindTexture(Key, TexIndex);
+                if (NewImage.Equals(Image) && !QueryKeyUpload(Vmm, Key, Size, NvGpuBufferType.Texture))
+                {
+                    Gpu.Renderer.Texture.Bind(Key, TexIndex);
+
+                    HasCachedTexture = true;
+                }
             }
-            else
+
+            if (!HasCachedTexture)
             {
-                GalImage NewImage = TextureFactory.MakeTexture(Vmm, TicPosition);
+                byte[] Data = TextureFactory.GetTextureData(Vmm, TicPosition);
 
-                long Size = (uint)ImageUtils.GetSize(NewImage);
-
-                bool HasCachedTexture = false;
-
-                if (Gpu.Renderer.Texture.TryGetCachedTexture(Key, Size, out GalImage Image))
-                {
-                    if (NewImage.Equals(Image) && !QueryKeyUpload(Vmm, Key, Size, NvGpuBufferType.Texture))
-                    {
-                        Gpu.Renderer.Texture.Bind(Key, TexIndex);
-
-                        HasCachedTexture = true;
-                    }
-                }
-
-                if (!HasCachedTexture)
-                {
-                    byte[] Data = TextureFactory.GetTextureData(Vmm, TicPosition);
-
-                    Gpu.Renderer.Texture.Create(Key, Data, NewImage);
-                }
-
-                Gpu.Renderer.Texture.Bind(Key, TexIndex);
+                Gpu.Renderer.Texture.Create(Key, Data, NewImage);
             }
+
+            Gpu.Renderer.Texture.Bind(Key, TexIndex);
 
             Gpu.Renderer.Texture.SetSampler(Sampler);
         }
@@ -874,11 +852,6 @@ namespace Ryujinx.Graphics
         private void WriteRegister(NvGpuEngine3dReg Reg, int Value)
         {
             Registers[(int)Reg] = Value;
-        }
-
-        public bool IsFrameBufferPosition(long Position)
-        {
-            return FrameBuffers.Contains(Position);
         }
 
         private bool QueryKeyUpload(NvGpuVmm Vmm, long Key, long Size, NvGpuBufferType Type)

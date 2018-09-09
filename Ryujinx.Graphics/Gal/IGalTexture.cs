@@ -7,9 +7,11 @@ namespace Ryujinx.Graphics.Gal
 
         void Create(long Key, byte[] Data, GalImage Image);
 
-        void CreateFb(long Key, long Size, GalImage Image);
+        void EnsureRT(long Key, long Size, GalImage Image);
 
         bool TryGetCachedTexture(long Key, long DataSize, out GalImage Image);
+
+        bool IsCached(long Key);
 
         void Bind(long Key, int Index);
 

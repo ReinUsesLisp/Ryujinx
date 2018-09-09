@@ -139,6 +139,11 @@ namespace Ryujinx.Graphics.Gal.OpenGL
             return false;
         }
 
+        public bool Contains(long Key)
+        {
+            return Cache.ContainsKey(Key);
+        }
+
         private void ClearCacheIfNeeded()
         {
             int Timestamp = Environment.TickCount;
