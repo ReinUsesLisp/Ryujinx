@@ -9,6 +9,8 @@ namespace Ryujinx.Graphics.Gal
 
         void EnsureRT(long Key, long Size, GalImage Image);
 
+        void Reinterpret(long Key, GalImage Image);
+
         bool TryGetCachedTexture(long Key, long DataSize, out GalImage Image);
 
         bool IsCached(long Key);

@@ -133,8 +133,6 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                 (InternalFmt, PixelFormat, PixelType) = OGLEnumConverter.GetImageFormat(NewImage.Format);
             }
 
-            GL.BindTexture(TextureTarget.Texture2D, Handle);
-
             if (CopyBuffer == 0)
             {
                 CopyBuffer = GL.GenBuffer();
@@ -143,7 +141,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
             int CurrentSize = Math.Max(ImageUtils.GetSize(NewImage),
                                        ImageUtils.GetSize(Image));
 
-            GL.BindBuffer(BufferTarget.PixelPackBuffer, CopyBuffer);
+            GL.BindBuffer(BufferTarget.PixelPackBuffer,   CopyBuffer);
             GL.BindBuffer(BufferTarget.PixelUnpackBuffer, CopyBuffer);
 
             if (CopyBufferSize < CurrentSize)
@@ -152,6 +150,8 @@ namespace Ryujinx.Graphics.Gal.OpenGL
 
                 GL.BufferData(BufferTarget.PixelPackBuffer, CurrentSize, IntPtr.Zero, BufferUsageHint.StreamCopy);
             }
+
+            GL.BindTexture(TextureTarget.Texture2D, Handle);
 
             if (ImageUtils.IsCompressed(Image.Format))
             {
@@ -162,17 +162,11 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                 GL.GetTexImage(TextureTarget.Texture2D, 0, this.PixelFormat, this.PixelType, IntPtr.Zero);
             }
 
-            GL.DeleteTexture(Handle);
+            /*GL.DeleteTexture(Handle);
 
             Handle = GL.GenTexture();
 
-            GL.BindTexture(TextureTarget.Texture2D, Handle);
-
-            const int MinFilter = (int)TextureMinFilter.Linear;
-            const int MagFilter = (int)TextureMagFilter.Linear;
-
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, MinFilter);
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, MagFilter);
+            GL.BindTexture(TextureTarget.Texture2D, Handle);*/
 
             const int Level = 0;
             const int Border = 0;

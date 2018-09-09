@@ -29,5 +29,12 @@ namespace Ryujinx.Graphics.Gal
             this.ZSource = ZSource;
             this.WSource = WSource;
         }
+
+        public bool CacheEquals(GalImage Other)
+        {
+            return Other.Width == Width &&
+                Other.Height == Height &&
+                Other.Format == Format;
+        }
     }
 }

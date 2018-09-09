@@ -49,6 +49,16 @@ namespace Ryujinx.Graphics.Gal.OpenGL
             CachedImage.EnsureRT(Image);
         }
 
+        public void Reinterpret(long Key, GalImage Image)
+        {
+            if (!TryGetImage(Key, out ImageHandler CachedImage))
+            {
+                throw new InvalidOperationException("Can't reinterpret an unexistant image");
+            }
+
+            CachedImage.Reinterpret(Image);
+        }
+
         public bool TryGetImage(long Key, out ImageHandler CachedImage)
         {
             if (TextureCache.TryGetValue(Key, out CachedImage))

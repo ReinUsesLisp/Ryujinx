@@ -100,6 +100,10 @@ namespace Ryujinx.Graphics
             SetAlphaBlending(State);
             SetPrimitiveRestart(State);
 
+            SetFrameBuffer(Vmm, 0);
+            SetZeta(Vmm);
+            SetRenderTargets();
+
             long[] Keys = UploadShaders(Vmm);
 
             Gpu.Renderer.Shader.BindProgram();
@@ -107,10 +111,6 @@ namespace Ryujinx.Graphics
             UploadTextures(Vmm, State, Keys);
             UploadConstBuffers(Vmm, State, Keys);
             UploadVertexArrays(Vmm, State);
-
-            SetFrameBuffer(Vmm, 0);
-            SetZeta(Vmm);
-            SetRenderTargets();
 
             DispatchRender(Vmm, State);
 
@@ -513,7 +513,7 @@ namespace Ryujinx.Graphics
 
             if (Gpu.Renderer.Texture.TryGetCachedTexture(Key, Size, out GalImage Image))
             {
-                if (NewImage.Equals(Image) && !QueryKeyUpload(Vmm, Key, Size, NvGpuBufferType.Texture))
+                if (Image.CacheEquals(NewImage) && !QueryKeyUpload(Vmm, Key, Size, NvGpuBufferType.Texture))
                 {
                     HasCachedTexture = true;
                 }
