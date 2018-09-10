@@ -1,4 +1,5 @@
 using Ryujinx.Graphics.Memory;
+using System;
 using System.Collections.Concurrent;
 using System.Threading;
 
@@ -154,9 +155,12 @@ namespace Ryujinx.Graphics
             {
                 switch (SubChannels[PBEntry.SubChannel])
                 {
-                    case NvGpuEngine._2d: Call2dMethod (Vmm, PBEntry); break;
-                    case NvGpuEngine._3d: Call3dMethod (Vmm, PBEntry); break;
-                    case NvGpuEngine.Dma: CallDmaMethod(Vmm, PBEntry); break;
+                    case NvGpuEngine._2d:     Call2dMethod     (Vmm, PBEntry); break;
+                    case NvGpuEngine._3d:     Call3dMethod     (Vmm, PBEntry); break;
+                    case NvGpuEngine.Dma:     CallDmaMethod    (Vmm, PBEntry); break;
+                    case NvGpuEngine.Compute: CallComputeMethod(Vmm, PBEntry); break;
+
+                    default: throw new NotImplementedException(SubChannels[PBEntry.SubChannel].ToString());
                 }
             }
         }
@@ -193,6 +197,11 @@ namespace Ryujinx.Graphics
         private void CallDmaMethod(NvGpuVmm Vmm, NvGpuPBEntry PBEntry)
         {
             Gpu.EngineDma.CallMethod(Vmm, PBEntry);
+        }
+
+        private void CallComputeMethod(NvGpuVmm Vmm, NvGpuPBEntry PBEntry)
+        {
+            Gpu.EngineCompute.CallMethod(Vmm, PBEntry);
         }
     }
 }
