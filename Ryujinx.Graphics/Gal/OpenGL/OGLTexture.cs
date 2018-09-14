@@ -98,16 +98,6 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                     Type,
                     Data);
             }
-
-            int SwizzleR = (int)OGLEnumConverter.GetTextureSwizzle(Image.XSource);
-            int SwizzleG = (int)OGLEnumConverter.GetTextureSwizzle(Image.YSource);
-            int SwizzleB = (int)OGLEnumConverter.GetTextureSwizzle(Image.ZSource);
-            int SwizzleA = (int)OGLEnumConverter.GetTextureSwizzle(Image.WSource);
-
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureSwizzleR, SwizzleR);
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureSwizzleG, SwizzleG);
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureSwizzleB, SwizzleB);
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureSwizzleA, SwizzleA);
         }
 
         public void CreateFb(long Key, long Size, GalImage Image)
@@ -120,6 +110,22 @@ namespace Ryujinx.Graphics.Gal.OpenGL
             }
 
             CachedImage.EnsureSetup(Image);
+        }
+
+        public void Reinterpret(long Key, long Size, GalImage Image)
+        {
+            if (!TryGetImage(Key, out ImageHandler CachedImage))
+            {
+                throw new InvalidOperationException();
+            }
+
+            GL.BindTexture(TextureTarget.Texture2D, CachedImage.Handle);
+
+            byte[] Data = new byte[ImageUtils.GetSize(CachedImage.Image)];
+
+            GL.GetTexImage(TextureTarget.Texture2D, 0, CachedImage.PixelFormat, CachedImage.PixelType, Data);
+
+            Create(Key, Data, Image);
         }
 
         public bool TryGetImage(long Key, out ImageHandler CachedImage)
@@ -182,7 +188,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
 
         public bool TryGetCachedTexture(long Key, long DataSize, out GalImage Image)
         {
-            if (TextureCache.TryGetSize(Key, out long Size) && Size == DataSize)
+            //if (TextureCache.TryGetSize(Key, out long Size) && Size == DataSize)
             {
                 if (TextureCache.TryGetValue(Key, out ImageHandler CachedImage))
                 {
@@ -197,39 +203,53 @@ namespace Ryujinx.Graphics.Gal.OpenGL
             return false;
         }
 
-        public void Bind(long Key, int Index)
+        public bool IsCached(long Key)
+        {
+            return TextureCache.Contains(Key);
+        }
+
+        public void Bind(long Key, int Index, GalImage NewImage, GalTextureSampler Sampler)
         {
             if (TextureCache.TryGetValue(Key, out ImageHandler CachedImage))
             {
                 GL.ActiveTexture(TextureUnit.Texture0 + Index);
 
                 GL.BindTexture(TextureTarget.Texture2D, CachedImage.Handle);
+
+                int WrapS = (int)OGLEnumConverter.GetTextureWrapMode(Sampler.AddressU);
+                int WrapT = (int)OGLEnumConverter.GetTextureWrapMode(Sampler.AddressV);
+
+                int MinFilter = (int)OGLEnumConverter.GetTextureMinFilter(Sampler.MinFilter, Sampler.MipFilter);
+                int MagFilter = (int)OGLEnumConverter.GetTextureMagFilter(Sampler.MagFilter);
+
+                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, WrapS);
+                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, WrapT);
+
+                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, MinFilter);
+                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, MagFilter);
+
+                float[] Color = new float[]
+                {
+                    Sampler.BorderColor.Red,
+                    Sampler.BorderColor.Green,
+                    Sampler.BorderColor.Blue,
+                    Sampler.BorderColor.Alpha
+                };
+
+                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureBorderColor, Color);
+
+                int SwizzleR = (int)OGLEnumConverter.GetTextureSwizzle(NewImage.XSource);
+                int SwizzleG = (int)OGLEnumConverter.GetTextureSwizzle(NewImage.YSource);
+                int SwizzleB = (int)OGLEnumConverter.GetTextureSwizzle(NewImage.ZSource);
+                int SwizzleA = (int)OGLEnumConverter.GetTextureSwizzle(NewImage.WSource);
+
+                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureSwizzleR, SwizzleR);
+                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureSwizzleG, SwizzleG);
+                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureSwizzleB, SwizzleB);
+                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureSwizzleA, SwizzleA);
+
+                CachedImage.Image.XSource = NewImage.XSource;
             }
-        }
-
-        public void SetSampler(GalTextureSampler Sampler)
-        {
-            int WrapS = (int)OGLEnumConverter.GetTextureWrapMode(Sampler.AddressU);
-            int WrapT = (int)OGLEnumConverter.GetTextureWrapMode(Sampler.AddressV);
-
-            int MinFilter = (int)OGLEnumConverter.GetTextureMinFilter(Sampler.MinFilter, Sampler.MipFilter);
-            int MagFilter = (int)OGLEnumConverter.GetTextureMagFilter(Sampler.MagFilter);
-
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, WrapS);
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, WrapT);
-
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, MinFilter);
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, MagFilter);
-
-            float[] Color = new float[]
-            {
-                Sampler.BorderColor.Red,
-                Sampler.BorderColor.Green,
-                Sampler.BorderColor.Blue,
-                Sampler.BorderColor.Alpha
-            };
-
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureBorderColor, Color);
         }
     }
 }

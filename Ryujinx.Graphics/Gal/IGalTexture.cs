@@ -9,10 +9,12 @@ namespace Ryujinx.Graphics.Gal
 
         void CreateFb(long Key, long Size, GalImage Image);
 
+        void Reinterpret(long Key, long Size, GalImage Image);
+
         bool TryGetCachedTexture(long Key, long DataSize, out GalImage Image);
 
-        void Bind(long Key, int Index);
+        bool IsCached(long Key);
 
-        void SetSampler(GalTextureSampler Sampler);
+        void Bind(long Key, int Index, GalImage NewSwizzle, GalTextureSampler Sampler);
     }
 }

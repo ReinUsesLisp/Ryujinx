@@ -411,7 +411,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                 GL.TexImage2D(
                     TextureTarget.Texture2D,
                     Level,
-                    Tex.InternalFormat,
+                    Tex.InternalFmt,
                     Width,
                     Height,
                     Border,

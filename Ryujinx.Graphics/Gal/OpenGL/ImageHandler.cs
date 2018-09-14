@@ -9,14 +9,14 @@ namespace Ryujinx.Graphics.Gal.OpenGL
         private static int CopyBuffer = 0;
         private static int CopyBufferSize = 0;
 
-        public GalImage Image { get; private set; }
+        public GalImage Image;
 
         public int Width  => Image.Width;
         public int Height => Image.Height;
 
         public GalImageFormat Format => Image.Format;
 
-        public PixelInternalFormat InternalFormat { get; private set; }
+        public PixelInternalFormat InternalFmt { get; private set; }
         public PixelFormat         PixelFormat    { get; private set; }
         public PixelType           PixelType      { get; private set; }
 
@@ -46,21 +46,13 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                 return;
             }
 
-            PixelInternalFormat InternalFmt;
-            PixelFormat         PixelFormat;
-            PixelType           PixelType;
-
             if (ImageUtils.IsCompressed(NewImage.Format))
             {
-                InternalFmt = (PixelInternalFormat)OGLEnumConverter.GetCompressedImageFormat(NewImage.Format);
+                throw new NotImplementedException();
+            }
 
-                PixelFormat = default(PixelFormat);
-                PixelType   = default(PixelType);
-            }
-            else
-            {
-                (InternalFmt, PixelFormat, PixelType) = OGLEnumConverter.GetImageFormat(NewImage.Format);
-            }
+            (PixelInternalFormat InternalFmt, PixelFormat PixelFormat, PixelType PixelType) =
+                OGLEnumConverter.GetImageFormat(NewImage.Format);
 
             GL.BindTexture(TextureTarget.Texture2D, Handle);
 
@@ -84,20 +76,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                     GL.BufferData(BufferTarget.PixelPackBuffer, CurrentSize, IntPtr.Zero, BufferUsageHint.StreamCopy);
                 }
 
-                if (ImageUtils.IsCompressed(Image.Format))
-                {
-                    GL.GetCompressedTexImage(TextureTarget.Texture2D, 0, IntPtr.Zero);
-                }
-                else
-                {
-                    GL.GetTexImage(TextureTarget.Texture2D, 0, this.PixelFormat, this.PixelType, IntPtr.Zero);
-                }
-
-                GL.DeleteTexture(Handle);
-
-                Handle = GL.GenTexture();
-
-                GL.BindTexture(TextureTarget.Texture2D, Handle);
+                GL.GetTexImage(TextureTarget.Texture2D, 0, this.PixelFormat, this.PixelType, IntPtr.Zero);
             }
 
             const int MinFilter = (int)TextureMinFilter.Linear;
@@ -109,33 +88,16 @@ namespace Ryujinx.Graphics.Gal.OpenGL
             const int Level = 0;
             const int Border = 0;
 
-            if (ImageUtils.IsCompressed(NewImage.Format))
-            {
-                Console.WriteLine("Hit");
-
-                GL.CompressedTexImage2D(
-                    TextureTarget.Texture2D,
-                    Level,
-                    (InternalFormat)InternalFmt,
-                    NewImage.Width,
-                    NewImage.Height,
-                    Border,
-                    ImageUtils.GetSize(NewImage),
-                    IntPtr.Zero);
-            }
-            else
-            {
-                GL.TexImage2D(
-                    TextureTarget.Texture2D,
-                    Level,
-                    InternalFmt,
-                    NewImage.Width,
-                    NewImage.Height,
-                    Border,
-                    PixelFormat,
-                    PixelType,
-                    IntPtr.Zero);
-            }
+            GL.TexImage2D(
+                TextureTarget.Texture2D,
+                Level,
+                InternalFmt,
+                NewImage.Width,
+                NewImage.Height,
+                Border,
+                PixelFormat,
+                PixelType,
+                IntPtr.Zero);
 
             if (Initialized)
             {
@@ -143,9 +105,11 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                 GL.BindBuffer(BufferTarget.PixelUnpackBuffer, 0);
             }
 
-            Image = NewImage;
+            Image.Width  = NewImage.Width;
+            Image.Height = NewImage.Height;
+            Image.Format = NewImage.Format;
 
-            this.InternalFormat = InternalFmt;
+            this.InternalFmt = InternalFmt;
             this.PixelFormat = PixelFormat;
             this.PixelType = PixelType;
 
